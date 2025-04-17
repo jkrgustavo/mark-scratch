@@ -21,13 +21,8 @@ end
 ---@return boolean
 function Scratch:validate()
 
-    if not self.initialized then
-        vim.notify("Uninitialized", vim.log.levels.WARN)
-        return false
-    end
-
     for k, v in pairs(self) do
-        if not v or v == -1 then
+        if (not v or v == -1) and k ~= "windnr" then
             vim.notify("[" .. k .. "] is uninitialized", vim.log.levels.WARN)
             return false
         end
@@ -45,7 +40,7 @@ function Scratch:validate()
         return false
     end
 
-    if #vim.api.nvim_get_autocmds({ group = self.augroup }) == 0 then
+    if #vim.api.nvim_get_autocmds({ group = self.augroup }) == 0 and not self.initialized then
         vim.notify("No autocommands are setup", vim.log.levels.WARN)
         return false
     end
@@ -59,15 +54,14 @@ function Scratch:validate()
 end
 
 ---@param bufnr integer
----@param group integer
-local function attach_tree_lsp(bufnr, group)
+local function attach_tree_lsp(bufnr)
 
-    if not vim.api.nvim_buf_is_valid(bufnr) or group == -1 then
-        error("Invalid Scratch from within 'start_tree_lsp'")
+    if not vim.api.nvim_buf_is_valid(bufnr) then
+        error("Bufnr is invalid or group == -1, in 'attach_tree_lsp'")
         return -1
     end
 
-    ---@type vim.lsp.ClientConfig
+--    ---@type vim.lsp.ClientConfig
     local client_config = {
         name = "scratch-marksman",
         cmd = { 'marksman', 'server' },
@@ -88,7 +82,6 @@ local function attach_tree_lsp(bufnr, group)
 
     vim.treesitter.language.add('markdown')
     vim.treesitter.start(bufnr, 'markdown')
-
 
     return clinr
 end
@@ -112,15 +105,13 @@ local function setup_auto_commands(scratch)
 
     vim.api.nvim_create_autocmd({ "VimLeavePre"}, {
         buffer = scratch.bufnr,
-        group = scratch.augroup,
+        group = augroup,
         once = true,
-        callback = function()
-            vim.defer_fn(function() scratch:shutdown() end, 20)
-        end
+        callback = function() scratch:destroy() end
     })
 
     vim.api.nvim_create_autocmd({ "BufLeave", "BufWinLeave" }, {
-        buffer = scratch.lspnr,
+        buffer = scratch.bufnr,
         once = true,
         group = augroup,
         callback = function() scratch:close_window() end
@@ -130,12 +121,30 @@ local function setup_auto_commands(scratch)
         buffer = scratch.bufnr,
         once = true,
         group = augroup,
-        callback = function()
-            vim.defer_fn(function() scratch:shutdown() end, 20)
-        end
+        callback = function() scratch:close_window() end
     })
 
     return augroup
+end
+
+---@param scratch Scratch
+local function setup_user_commands(scratch)
+
+    vim.api.nvim_create_user_command("MSDest", function()
+        scratch:destroy()
+    end, { desc = "Destroy a buffer" })
+
+    vim.api.nvim_create_user_command("MSOpen", function()
+        scratch:open_window()
+    end, { desc = "Open scratch window"})
+
+    vim.api.nvim_create_user_command("MSClear", function()
+        scratch:clear()
+    end, { desc = "Clear scratch window"})
+
+    vim.api.nvim_create_user_command("MSClose", function()
+        scratch:close_window()
+    end, { desc = "Close scratch window"})
 end
 
 function Scratch:open_window()
@@ -154,21 +163,35 @@ function Scratch:open_window()
         border = 'rounded',
         title = 'Notes'
     })
+
 end
 
 function Scratch:close_window()
     assert(self:validate(), "Closing window")
-
-    vim.api.nvim_win_close(self.windnr, false)
-    if vim.api.nvim_win_is_valid(self.windnr) then
-        vim.notify("Attempt to close window failed, forcing...")
-        vim.api.nvim_win_close(self.windnr, true)
+    if not self.windnr then
+        return
     end
 
-    self.windnr = nil
+    vim.api.nvim_win_close(self.windnr, false)
+
+    vim.defer_fn(function()
+        if self.windnr and vim.api.nvim_win_is_valid(self.windnr) then
+            vim.notify("Attempt to close window failed, forcing...")
+            vim.api.nvim_win_close(self.windnr, true)
+        end
+
+        self.windnr = nil
+    end, 10)
+
 end
 
-function Scratch:shutdown()
+function Scratch:clear()
+    assert(self:validate(), "in 'clear'")
+
+    vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, true, {})
+end
+
+function Scratch:destroy()
     assert(self:validate(), "While shutting down")
 
     if self.windnr then
@@ -182,11 +205,12 @@ function Scratch:shutdown()
     vim.api.nvim_clear_autocmds({ group = self.augroup })
     vim.api.nvim_del_augroup_by_id(self.augroup)
 
+    vim.defer_fn(function()
+        vim.bo[self.bufnr].buflisted = false
+        vim.api.nvim_buf_delete(self.bufnr, { force = true })
+    end, 10)
 
-    vim.bo[self.bufnr].buflisted = false
-    vim.api.nvim_buf_delete(self.bufnr, { force = true })
-
-    assert(~vim.api.nvim_buf_is_valid(self.bufnr))
+    self.initialized = false
 
 end
 
@@ -198,27 +222,18 @@ function Scratch:setup()
     end
 
     self.bufnr = create_buffer()
-    self.lspnr = attach_tree_lsp(self.bufnr, self.augroup)
+    self.lspnr = attach_tree_lsp(self.bufnr)
     self.augroup = setup_auto_commands(self)
     self.initialized = true
 
-    vim.api.nvim_create_user_command("DL", function()
-        if vim.api.nvim_buf_is_valid(self.bufnr) then
-            vim.defer_fn(function()
-                vim.bo[self.bufnr].buflisted = false
-                vim.api.nvim_buf_delete(self.bufnr, { unload = true })
-            end, 10)
-        end
-    end, { desc = "Destroy a buffer" })
-
-    vim.api.nvim_create_user_command("MSOpen", function()
-        assert(self:validate(), "Open usr command")
-
-        self:open_window()
-    end, { desc = "Open scratch window"})
-
+    setup_user_commands(self)
 
     assert(self:validate(), "End of setup")
 end
 
 return Scratch.new()
+
+-- TODO: Fix the lifecycle, I should be able to destroy and create buffers easily
+-- TODO: Keybindings
+
+-- using ':q' triggers the 'BufHidden' event, calling shutdown()
