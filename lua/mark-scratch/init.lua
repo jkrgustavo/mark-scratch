@@ -14,7 +14,7 @@ function Scratch.new()
         augroup = -1,
         lspnr = -1,
         windnr = nil,
-        initialized = false
+        initialized = false,
     }, Scratch)
 end
 
@@ -80,6 +80,8 @@ local function attach_tree_lsp(bufnr)
     end
     vim.lsp.buf_attach_client(bufnr, clinr)
 
+---@diagnostic disable-next-line: param-type-mismatch
+    vim.treesitter.query.set('markdown', 'highlights', nil) -- nil resets the explicit query
     vim.treesitter.language.add('markdown')
     vim.treesitter.start(bufnr, 'markdown')
 
@@ -88,13 +90,13 @@ end
 
 local function create_buffer()
     local bufnr = vim.api.nvim_create_buf(true, false)
+    vim.api.nvim_buf_set_name(bufnr, "[Note" .. os.time() .. "].md")
 
     vim.bo[bufnr].buftype = "nofile"
     vim.bo[bufnr].bufhidden = "hide" -- NOTE: Change this to 'hide' after testing 
     vim.bo[bufnr].swapfile = false
     vim.bo[bufnr].filetype = "markdown"
 
-    vim.api.nvim_buf_set_name(bufnr, "[Note" .. os.time() .. "].md")
 
     return bufnr
 end
@@ -112,7 +114,7 @@ local function setup_auto_commands(scratch)
 
     vim.api.nvim_create_autocmd({ "BufLeave", "BufWinLeave" }, {
         buffer = scratch.bufnr,
-        once = true,
+        once = false,
         group = augroup,
         callback = function() scratch:close_window() end
     })
@@ -122,6 +124,13 @@ local function setup_auto_commands(scratch)
         once = true,
         group = augroup,
         callback = function() scratch:close_window() end
+    })
+
+    vim.api.nvim_create_autocmd({ "WinClosed" }, {
+        buffer = scratch.bufnr,
+        once = false,
+        group = augroup,
+        callback = function() scratch.windnr = nil end
     })
 
     return augroup
@@ -167,8 +176,10 @@ function Scratch:open_window()
 end
 
 function Scratch:close_window()
-    assert(self:validate(), "Closing window")
     if not self.windnr then
+        return
+    elseif not vim.api.nvim_win_is_valid(self.windnr) then
+        self.windnr = nil
         return
     end
 
@@ -192,15 +203,17 @@ function Scratch:clear()
 end
 
 function Scratch:destroy()
-    assert(self:validate(), "While shutting down")
 
     if self.windnr then
         vim.api.nvim_win_close(self.windnr, true)
     end
 
+    vim.treesitter.stop(self.bufnr)
+
     if not vim.lsp.client_is_stopped(self.lspnr) then
         vim.lsp.stop_client(self.lspnr, true)
     end
+
 
     vim.api.nvim_clear_autocmds({ group = self.augroup })
     vim.api.nvim_del_augroup_by_id(self.augroup)
@@ -208,9 +221,9 @@ function Scratch:destroy()
     vim.defer_fn(function()
         vim.bo[self.bufnr].buflisted = false
         vim.api.nvim_buf_delete(self.bufnr, { force = true })
-    end, 10)
 
-    self.initialized = false
+        self.initialized = false
+    end, 10)
 
 end
 
@@ -233,7 +246,5 @@ end
 
 return Scratch.new()
 
--- TODO: Fix the lifecycle, I should be able to destroy and create buffers easily
 -- TODO: Keybindings
-
--- using ':q' triggers the 'BufHidden' event, calling shutdown()
+-- TODO: Actual ui
