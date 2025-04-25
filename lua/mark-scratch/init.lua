@@ -1,3 +1,7 @@
+package.loaded["mark-scratch.window"] = nil
+
+local Win = require("mark-scratch.window")
+
 ---@class Scratch
 ---@field bufnr integer
 ---@field initialized boolean
@@ -93,10 +97,9 @@ local function create_buffer()
     vim.api.nvim_buf_set_name(bufnr, "[Note" .. os.time() .. "].md")
 
     vim.bo[bufnr].buftype = "nofile"
-    vim.bo[bufnr].bufhidden = "hide" -- NOTE: Change this to 'hide' after testing 
+    vim.bo[bufnr].bufhidden = "hide"
     vim.bo[bufnr].swapfile = false
     vim.bo[bufnr].filetype = "markdown"
-
 
     return bufnr
 end
@@ -242,6 +245,10 @@ function Scratch:setup()
     setup_user_commands(self)
 
     assert(self:validate(), "End of setup")
+end
+
+function Scratch:test()
+    return Win
 end
 
 return Scratch.new()
