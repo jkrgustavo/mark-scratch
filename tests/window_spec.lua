@@ -1,7 +1,5 @@
 -- tests/mark‑scratch_spec.lua
 local Scratch = require("mark-scratch"):test()
-local foo = require('luassert')
-require("plenary.busted")
 
 local eq   = assert.equals
 local same = assert.are.same
@@ -20,8 +18,6 @@ local function assert_opts(scope, handle, opts)
             ("%s option %q mismatch"):format(scope, k))
     end
 end
-
-
 
 local BORDER_PRESETS = {
     none    = { "",  "",  "",  "",  "",  "",  "",  "" },

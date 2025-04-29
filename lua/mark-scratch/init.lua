@@ -1,6 +1,8 @@
 package.loaded["mark-scratch.window"] = nil
+package.loaded["mark-scratch.utils"] = nil
 
 local Win = require("mark-scratch.window")
+local Utils = require("mark-scratch.utils")
 
 ---@class Scratch
 ---@field bufnr integer
@@ -23,34 +25,40 @@ function Scratch.new()
 end
 
 ---@return boolean
-function Scratch:validate()
+---@param silent? boolean
+function Scratch:validate(silent)
+
+    if not self.initialized then
+        if not silent then vim.notify("Uninitialized", vim.log.levels.WARN) end
+        return false
+    end
 
     for k, v in pairs(self) do
         if (not v or v == -1) and k ~= "windnr" then
-            vim.notify("[" .. k .. "] is uninitialized", vim.log.levels.WARN)
+            if not silent then error("[" .. k .. "] is uninitialized/invalid", 2) end
             return false
         end
     end
 
     if not vim.api.nvim_buf_is_valid(self.bufnr) then
-        vim.notify("Invalid buffer", vim.log.levels.WARN)
+        if not silent then error("Invalid buffer", 2) end
         return false
     end
 
     if not vim.lsp.client_is_stopped(self.lspnr) and
         not vim.lsp.buf_is_attached(self.bufnr, self.lspnr)
     then
-        vim.notify("Lsp isn't attached to buffer", vim.log.levels.WARN)
+        if not silent then error("Lsp isn't attached to buffer", 2) end
         return false
     end
 
     if #vim.api.nvim_get_autocmds({ group = self.augroup }) == 0 and not self.initialized then
-        vim.notify("No autocommands are setup", vim.log.levels.WARN)
+        if not silent then error("No autocommands are setup", 2) end
         return false
     end
 
     if self.windnr and not vim.api.nvim_win_is_valid(self.windnr) then
-        vim.notify("Invalid windnr", vim.log.levels.WARN)
+        if not silent then error("Invalid windnr", 2) end
         return false
     end
 
@@ -65,7 +73,7 @@ local function attach_tree_lsp(bufnr)
         return -1
     end
 
---    ---@type vim.lsp.ClientConfig
+    ---@type vim.lsp.ClientConfig
     local client_config = {
         name = "scratch-marksman",
         cmd = { 'marksman', 'server' },
@@ -84,17 +92,22 @@ local function attach_tree_lsp(bufnr)
     end
     vim.lsp.buf_attach_client(bufnr, clinr)
 
----@diagnostic disable-next-line: param-type-mismatch
+    ---@diagnostic disable-next-line: param-type-mismatch
     vim.treesitter.query.set('markdown', 'highlights', nil) -- nil resets the explicit query
     vim.treesitter.language.add('markdown')
     vim.treesitter.start(bufnr, 'markdown')
 
+
+
     return clinr
 end
 
+local count = 0
+
 local function create_buffer()
     local bufnr = vim.api.nvim_create_buf(true, false)
-    vim.api.nvim_buf_set_name(bufnr, "[Note" .. os.time() .. "].md")
+    count = count + 1
+    vim.api.nvim_buf_set_name(bufnr, "[Note" .. "|" .. count .. "|" .. os.time() .. "].md")
 
     vim.bo[bufnr].buftype = "nofile"
     vim.bo[bufnr].bufhidden = "hide"
@@ -171,7 +184,6 @@ function Scratch:open_window()
         height = height,
         row = math.floor((vim.o.lines - height) / 2),
         col = math.floor((vim.o.columns - width) / 2),
-        style = 'minimal',
         border = 'rounded',
         title = 'Notes'
     })
@@ -205,28 +217,78 @@ function Scratch:clear()
     vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, true, {})
 end
 
+---@param bufnr integer
+local function cleanup_portals(bufnr)
+    local buf_portals = vim.fn.win_findbuf(bufnr)
+    if #buf_portals > 0 then
+        for _, p in ipairs(buf_portals) do
+            vim.api.nvim_win_close(p, true)
+        end
+    end
+end
+
+---@param bufnr integer
+---@param lspnr integer
+local function cleanup_lsp(bufnr, lspnr)
+    local bufs = vim.api.nvim_list_bufs()
+    local lsp_is_used_elsewere = false
+
+    if vim.lsp.buf_is_attached(bufnr, lspnr) then
+        vim.lsp.buf_detach_client(bufnr, lspnr)
+    end
+
+    for _, b in ipairs(bufs) do
+        if b ~= bufnr and vim.lsp.buf_is_attached(b, lspnr) then
+            lsp_is_used_elsewere = true
+            break
+        end
+    end
+
+
+    if not lsp_is_used_elsewere then
+        vim.lsp.stop_client(lspnr, true)
+        if not Utils.wait_until(function() return vim.lsp.client_is_stopped(lspnr) end) then
+            error("Unable to stop client!")
+            return
+        end
+    end
+
+end
+
 function Scratch:destroy()
 
-    if self.windnr then
-        vim.api.nvim_win_close(self.windnr, true)
-    end
+    cleanup_portals(self.bufnr)
+    self.windnr = nil
 
     vim.treesitter.stop(self.bufnr)
 
-    if not vim.lsp.client_is_stopped(self.lspnr) then
-        vim.lsp.stop_client(self.lspnr, true)
+    cleanup_lsp(self.bufnr, self.lspnr)
+
+    pcall(vim.api.nvim_clear_autocmds, { group = self.augroup })
+    pcall(vim.api.nvim_del_augroup_by_id, self.augroup)
+
+    local clean = Utils.wait_until(function()
+        local open_portals = #vim.fn.win_findbuf(self.bufnr) ~= 0
+        local lsp_attached = vim.lsp.buf_is_attached(self.bufnr, self.lspnr)
+        local aug_exists = pcall(vim.api.nvim_get_autocmds, { group = self.augroup })
+
+        return not open_portals and not lsp_attached and not aug_exists
+    end)
+
+    if clean then
+        if vim.api.nvim_buf_is_valid(self.bufnr) then
+            vim.bo[self.bufnr].buflisted = false
+            vim.api.nvim_buf_delete(self.bufnr, { force = true })
+        end
+
+        self.lspnr = -1
+        self.bufnr = -1
+        self.augroup = -1
+        self.initialized = false
+    else
+        error("unable to delete buffer: " .. self.bufnr)
     end
 
-
-    vim.api.nvim_clear_autocmds({ group = self.augroup })
-    vim.api.nvim_del_augroup_by_id(self.augroup)
-
-    vim.defer_fn(function()
-        vim.bo[self.bufnr].buflisted = false
-        vim.api.nvim_buf_delete(self.bufnr, { force = true })
-
-        self.initialized = false
-    end, 10)
 
 end
 
