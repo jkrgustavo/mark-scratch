@@ -83,15 +83,19 @@ end
 ---@param opts table
 ---@return obj
 function win:new_float(opts)
-    self.bufnr = opts.bufnr or vim.api.nvim_create_buf(true, false)
-    opts.bufnr = nil
+    if opts.bufnr then
+        self.bufnr = opts.bufnr
+        opts.bufnr = nil
+    else
+        self.bufnr = vim.api.nvim_create_buf(true, false)
+        count = count + 1
+        vim.api.nvim_buf_set_name(self.bufnr,"[MS-note-" .. count .. "].md")
 
-    count = count + 1
-    vim.api.nvim_buf_set_name(self.bufnr,"[MS-note-" .. count .. "].md")
-
-    for k, v in pairs(bufopt_defaults()) do
-        vim.api.nvim_set_option_value(k, v, { scope = 'local', buf = self.bufnr })
+        for k, v in pairs(bufopt_defaults()) do
+            vim.api.nvim_set_option_value(k, v, { scope = 'local', buf = self.bufnr })
+        end
     end
+
 
     local win_config = opts and vim.tbl_extend('force', winconfig_default(), opts)
         or winconfig_default()

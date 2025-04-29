@@ -146,7 +146,11 @@ local function setup_auto_commands(scratch)
         buffer = scratch.bufnr,
         once = false,
         group = augroup,
-        callback = function() scratch.windnr = nil end
+        callback = function()
+            if scratch.windnr and not vim.api.nvim_win_is_valid(scratch.windnr) then
+                scratch.windnr = nil
+            end
+        end
     })
 
     return augroup
@@ -173,42 +177,44 @@ local function setup_user_commands(scratch)
 end
 
 function Scratch:open_window()
-    assert(self:validate(), "Opening window")
+    assert(self:validate(), "Failed to validate while opening window")
 
     local width = 50
     local height = 50
 
-    self.windnr = vim.api.nvim_open_win(self.bufnr, true, {
+    ---@type vim.api.keyset.win_config
+    local config = {
         relative = "editor",
         width = width,
         height = height,
         row = math.floor((vim.o.lines - height) / 2),
         col = math.floor((vim.o.columns - width) / 2),
         border = 'rounded',
-        title = 'Notes'
-    })
+        title = 'Notes',
+        bufnr = self.bufnr
+    }
 
+    self.windnr = select(2, Win:new_float(config):wininfo())
 end
 
 function Scratch:close_window()
-    if not self.windnr then
-        return
-    elseif not vim.api.nvim_win_is_valid(self.windnr) then
+    if not self.windnr or not vim.api.nvim_win_is_valid(self.windnr) then
         self.windnr = nil
         return
     end
 
-    vim.api.nvim_win_close(self.windnr, false)
+    local winid = self.windnr or -1
+    local ok, err = pcall(vim.api.nvim_win_close, winid, false)
+    if not ok then
+        vim.print('close_window(): ' .. err)
+        return
+    end
 
-    vim.defer_fn(function()
-        if self.windnr and vim.api.nvim_win_is_valid(self.windnr) then
-            vim.notify("Attempt to close window failed, forcing...")
-            vim.api.nvim_win_close(self.windnr, true)
+    vim.schedule(function()
+        if not vim.api.nvim_win_is_valid(winid) then
+            self.windnr = nil
         end
-
-        self.windnr = nil
-    end, 10)
-
+    end)
 end
 
 function Scratch:clear()
@@ -222,7 +228,10 @@ local function cleanup_portals(bufnr)
     local buf_portals = vim.fn.win_findbuf(bufnr)
     if #buf_portals > 0 then
         for _, p in ipairs(buf_portals) do
-            vim.api.nvim_win_close(p, true)
+            local ok, err = pcall(vim.api.nvim_win_close, p, false)
+            if not ok then
+                vim.print("Not ok while cleaning up portals:" .. vim.inspect(err))
+            end
         end
     end
 end
@@ -257,6 +266,9 @@ end
 
 function Scratch:destroy()
 
+    pcall(vim.api.nvim_clear_autocmds, { group = self.augroup })
+    pcall(vim.api.nvim_del_augroup_by_id, self.augroup)
+
     cleanup_portals(self.bufnr)
     self.windnr = nil
 
@@ -264,8 +276,6 @@ function Scratch:destroy()
 
     cleanup_lsp(self.bufnr, self.lspnr)
 
-    pcall(vim.api.nvim_clear_autocmds, { group = self.augroup })
-    pcall(vim.api.nvim_del_augroup_by_id, self.augroup)
 
     local clean = Utils.wait_until(function()
         local open_portals = #vim.fn.win_findbuf(self.bufnr) ~= 0
@@ -315,5 +325,13 @@ end
 
 return Scratch.new()
 
--- TODO: Keybindings
--- TODO: Actual ui
+--[[ TODO:
+
+    - keybindings
+    - actual ui
+    - better error handling
+    - save to a file
+
+    - Use a temp file instead?
+
+--]]
