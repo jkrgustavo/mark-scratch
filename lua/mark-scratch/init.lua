@@ -1,7 +1,7 @@
-package.loaded["mark-scratch.window"] = nil
+package.loaded["mark-scratch.winbuf"] = nil
 package.loaded["mark-scratch.utils"] = nil
 
-local Win = require("mark-scratch.window")
+local Winbuf = require("mark-scratch.winbuf")
 local Utils = require("mark-scratch.utils")
 
 ---@class Scratch
@@ -97,22 +97,24 @@ local function attach_tree_lsp(bufnr)
     vim.treesitter.language.add('markdown')
     vim.treesitter.start(bufnr, 'markdown')
 
-
-
     return clinr
 end
 
 local count = 0
 
 local function create_buffer()
-    local bufnr = vim.api.nvim_create_buf(true, false)
     count = count + 1
-    vim.api.nvim_buf_set_name(bufnr, "[Note" .. "|" .. count .. "|" .. os.time() .. "].md")
+    local name = "[Note" .. "|" .. count .. "|" .. os.time() .. "].md"
 
-    vim.bo[bufnr].buftype = "nofile"
-    vim.bo[bufnr].bufhidden = "hide"
-    vim.bo[bufnr].swapfile = false
-    vim.bo[bufnr].filetype = "markdown"
+    local bufnr = Winbuf
+        :new({ name = name })
+        :bufopt({
+            ['buftype'] = 'nofile',
+            ['bufhidden'] = 'hide',
+            ['swapfile'] = false,
+            ['filetype'] = 'markdown'
+        })
+        :bufinfo()
 
     return bufnr
 end
@@ -191,10 +193,16 @@ function Scratch:open_window()
         col = math.floor((vim.o.columns - width) / 2),
         border = 'rounded',
         title = 'Notes',
-        bufnr = self.bufnr
     }
 
-    self.windnr = select(2, Win:new_float(config):wininfo())
+    self.windnr = Winbuf
+        :new({ bufnr = self.bufnr })
+        :float(config)
+        :winopt({
+            ['wrap'] = true,
+            ['conceallevel'] = 2
+        })
+        :wininfo()
 end
 
 function Scratch:close_window()
@@ -320,13 +328,14 @@ function Scratch:setup()
 end
 
 function Scratch:test()
-    return Win
+    return Winbuf
 end
 
 return Scratch.new()
 
 --[[ TODO:
 
+    - config
     - keybindings
     - actual ui
     - better error handling
