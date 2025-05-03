@@ -13,12 +13,12 @@ local function make_floating_opts(width, height)
         relative = "editor",
         width = width,
         height = height,
-        row = 5,
+        row = -5,
         col = -5,
         border = 'rounded',
         title = 'notes',
         title_pos = 'left',
-        anchor = 'NW'
+        anchor = 'SE'
     }
 end
 
@@ -72,10 +72,12 @@ end
 function obj:winopt(name, val)
     if type(name) == "table" then
         for k, v in pairs(name) do
-            vim.api.nvim_set_option_value(k, v, { scope = 'local', win = self.winid })
+            vim.wo[self.winid][0][k] = v
+            -- vim.api.nvim_set_option_value(k, v, { scope = 'local', win = self.winid })
         end
     else
-        vim.api.nvim_set_option_value(name, val, { scope = 'local', win = self.winid })
+        vim.wo[self.winid][0][name] = val
+        -- vim.api.nvim_set_option_value(name, val, { scope = 'local', win = self.winid })
     end
 
     return self
@@ -131,12 +133,14 @@ local winbuf = {}
 local count = 0
 ---@param opts winbufOpts
 function winbuf:new(opts)
+    count = count + 1
 
+    local name = opts.name or ('[winbuf | %d | %d]'):format(count, os.time())
     self.bufnr = opts.bufnr or vim.api.nvim_create_buf(true, false)
 
-    opts.name = opts.name or vim.api.nvim_buf_set_name(self.bufnr,
-        "[Note" .. "|" .. count .. "|" .. os.time() .. "].md")
-    count = count + 1
+    if not opts.bufnr then
+        vim.api.nvim_buf_set_name(self.bufnr, name)
+    end
 
     return setmetatable(winbuf, obj)
 end

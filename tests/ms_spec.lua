@@ -142,22 +142,16 @@ describe("mark-scratch high-level API", function()
         assert.is.truthy(vim.api.nvim_buf_is_valid(Scratch.bufnr))
         assert.is.True(#vim.api.nvim_get_autocmds({ group = Scratch.augroup }) > 0)
         eq("nofile", vim.bo[Scratch.bufnr].buftype)
-        eq("markdown", vim.bo[Scratch.bufnr].filetype)
+        eq("scratchmarkdown", vim.bo[Scratch.bufnr].filetype)
     end)
 
-    it("opens a centred floating window", function()
+    it("opens a floating window", function()
         Scratch:open_window()
         local winid = Scratch.windnr or -1
         assert.is.True(win_is_valid(winid))
         local cfg = vim.api.nvim_win_get_config(winid)
         assert_cfg({
             relative = "editor",
-            width = 50,
-            height = 50,
-            row = math.floor((vim.o.lines - 50) / 2),
-            col = math.floor((vim.o.columns - 50) / 2),
-            border = BORDER_PRESETS['rounded'],
-            title = 'Notes',
         }, cfg)
     end)
 

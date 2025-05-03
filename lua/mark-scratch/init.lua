@@ -77,23 +77,24 @@ local function attach_tree_lsp(bufnr)
     local client_config = {
         name = "scratch-marksman",
         cmd = { 'marksman', 'server' },
-        cmd_cwd = vim.fn.getcwd(),
         workspace_folders = nil,
-        root_dir = nil,
-        settings = {
-			filetypes = { "markdown" },
-        }
+        root_dir = vim.fn.getcwd(),
+		filetypes = { "scratchmarkdown" },
+        on_attach = function (client)
+            if client.server_capabilities.semanticTokensProvider then
+                vim.lsp.semantic_tokens.start(bufnr, client.id)
+            end
+        end
     }
-
     local clinr = vim.lsp.start(client_config, { bufnr = bufnr })
-    if not clinr then
-        error("Unable to get marksman started for the scratch buffer! Called 'vim.lsp.start'")
-        return -1
-    end
+
+    assert(clinr, "Unable to get marksman started for the scratch buffer! Called 'vim.lsp.start'")
+
     vim.lsp.buf_attach_client(bufnr, clinr)
 
     ---@diagnostic disable-next-line: param-type-mismatch
     vim.treesitter.query.set('markdown', 'highlights', nil) -- nil resets the explicit query
+    vim.treesitter.language.register('markdown', 'scratchmarkdown')
     vim.treesitter.language.add('markdown')
     vim.treesitter.start(bufnr, 'markdown')
 
@@ -112,7 +113,7 @@ local function create_buffer()
             ['buftype'] = 'nofile',
             ['bufhidden'] = 'hide',
             ['swapfile'] = false,
-            ['filetype'] = 'markdown'
+            ['filetype'] = 'scratchmarkdown'
         })
         :bufinfo()
 
@@ -181,23 +182,9 @@ end
 function Scratch:open_window()
     assert(self:validate(), "Failed to validate while opening window")
 
-    local width = 50
-    local height = 50
-
-    ---@type vim.api.keyset.win_config
-    local config = {
-        relative = "editor",
-        width = width,
-        height = height,
-        row = math.floor((vim.o.lines - height) / 2),
-        col = math.floor((vim.o.columns - width) / 2),
-        border = 'rounded',
-        title = 'Notes',
-    }
-
     self.windnr = Winbuf
         :new({ bufnr = self.bufnr })
-        :float(config)
+        :float()
         :winopt({
             ['wrap'] = true,
             ['conceallevel'] = 2
@@ -232,19 +219,6 @@ function Scratch:clear()
 end
 
 ---@param bufnr integer
-local function cleanup_portals(bufnr)
-    local buf_portals = vim.fn.win_findbuf(bufnr)
-    if #buf_portals > 0 then
-        for _, p in ipairs(buf_portals) do
-            local ok, err = pcall(vim.api.nvim_win_close, p, false)
-            if not ok then
-                vim.print("Not ok while cleaning up portals:" .. vim.inspect(err))
-            end
-        end
-    end
-end
-
----@param bufnr integer
 ---@param lspnr integer
 local function cleanup_lsp(bufnr, lspnr)
     local bufs = vim.api.nvim_list_bufs()
@@ -263,7 +237,7 @@ local function cleanup_lsp(bufnr, lspnr)
 
 
     if not lsp_is_used_elsewere then
-        vim.lsp.stop_client(lspnr, true)
+        vim.lsp.stop_client(lspnr, false)
         if not Utils.wait_until(function() return vim.lsp.client_is_stopped(lspnr) end) then
             error("Unable to stop client!")
             return
@@ -271,6 +245,21 @@ local function cleanup_lsp(bufnr, lspnr)
     end
 
 end
+
+
+---@param bufnr integer
+local function cleanup_portals(bufnr)
+    local buf_portals = vim.fn.win_findbuf(bufnr)
+    if #buf_portals > 0 then
+        for _, p in ipairs(buf_portals) do
+            local ok, err = pcall(vim.api.nvim_win_close, p, true)
+            if not ok then
+                vim.print("Not ok while cleaning up portals:" .. vim.inspect(err))
+            end
+        end
+    end
+end
+
 
 function Scratch:destroy()
 
@@ -283,7 +272,9 @@ function Scratch:destroy()
     vim.treesitter.stop(self.bufnr)
 
     cleanup_lsp(self.bufnr, self.lspnr)
-
+    for _, v in ipairs(vim.lsp.get_clients({ bufnr = self.bufnr })) do
+        cleanup_lsp(self.bufnr, v.id)
+    end
 
     local clean = Utils.wait_until(function()
         local open_portals = #vim.fn.win_findbuf(self.bufnr) ~= 0
@@ -292,6 +283,7 @@ function Scratch:destroy()
 
         return not open_portals and not lsp_attached and not aug_exists
     end)
+
 
     if clean then
         if vim.api.nvim_buf_is_valid(self.bufnr) then
