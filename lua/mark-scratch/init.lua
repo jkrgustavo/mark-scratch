@@ -1,14 +1,16 @@
 package.loaded["mark-scratch.winbuf"] = nil
 package.loaded["mark-scratch.utils"] = nil
+package.loaded["mark-scratch.lsp"] = nil
+-- package.loaded['mark-scratch.augroup'] = nil
 
 local Winbuf = require("mark-scratch.winbuf")
 local Utils = require("mark-scratch.utils")
+local MSGroup = require("mark-scratch.augroup")
+local Msp = require('mark-scratch.lsp')
 
 ---@class Scratch
 ---@field bufnr integer
 ---@field initialized boolean
----@field augroup integer
----@field lspnr integer
 ---@field windnr integer | nil
 local Scratch = {}
 
@@ -17,8 +19,6 @@ Scratch.__index = Scratch
 function Scratch.new()
     return setmetatable({
         bufnr = -1,
-        augroup = -1,
-        lspnr = -1,
         windnr = nil,
         initialized = false,
     }, Scratch)
@@ -29,7 +29,7 @@ end
 function Scratch:validate(silent)
 
     if not self.initialized then
-        if not silent then vim.notify("Uninitialized", vim.log.levels.WARN) end
+        if not silent then error("Uninitialized", 2) end
         return false
     end
 
@@ -45,14 +45,12 @@ function Scratch:validate(silent)
         return false
     end
 
-    if not vim.lsp.client_is_stopped(self.lspnr) and
-        not vim.lsp.buf_is_attached(self.bufnr, self.lspnr)
-    then
+    if not Msp:validate(self.bufnr, { started = true }) then
         if not silent then error("Lsp isn't attached to buffer", 2) end
         return false
     end
 
-    if #vim.api.nvim_get_autocmds({ group = self.augroup }) == 0 and not self.initialized then
+    if #vim.api.nvim_get_autocmds({ group = MSGroup }) == 0 and not self.initialized then
         if not silent then error("No autocommands are setup", 2) end
         return false
     end
@@ -73,8 +71,7 @@ local function attach_tree_lsp(bufnr)
         return -1
     end
 
-    ---@type vim.lsp.ClientConfig
-    local client_config = {
+    Msp:start_lsp(bufnr, {
         name = "scratch-marksman",
         cmd = { 'marksman', 'server' },
         workspace_folders = nil,
@@ -85,27 +82,20 @@ local function attach_tree_lsp(bufnr)
                 vim.lsp.semantic_tokens.start(bufnr, client.id)
             end
         end
-    }
-    local clinr = vim.lsp.start(client_config, { bufnr = bufnr })
-
-    assert(clinr, "Unable to get marksman started for the scratch buffer! Called 'vim.lsp.start'")
-
-    vim.lsp.buf_attach_client(bufnr, clinr)
+    })
 
     ---@diagnostic disable-next-line: param-type-mismatch
-    vim.treesitter.query.set('markdown', 'highlights', nil) -- nil resets the explicit query
+    vim.treesitter.query.set('markdown', 'highlights', nil) -- nil resets the explicit query from lspsaga
     vim.treesitter.language.register('markdown', 'scratchmarkdown')
     vim.treesitter.language.add('markdown')
     vim.treesitter.start(bufnr, 'markdown')
-
-    return clinr
 end
 
 local count = 0
 
 local function create_buffer()
     count = count + 1
-    local name = "[Note" .. "|" .. count .. "|" .. os.time() .. "].md"
+    local name = "[Note" .. "|" .. count .. "|" .. os.time() .. "|" .. math.random(1000) .. "].md"
 
     local bufnr = Winbuf
         :new({ name = name })
@@ -122,11 +112,10 @@ end
 
 ---@param scratch Scratch
 local function setup_auto_commands(scratch)
-    local augroup = vim.api.nvim_create_augroup("mark-scratch", { clear = true })
 
     vim.api.nvim_create_autocmd({ "VimLeavePre"}, {
         buffer = scratch.bufnr,
-        group = augroup,
+        group = MSGroup,
         once = true,
         callback = function() scratch:destroy() end
     })
@@ -134,29 +123,27 @@ local function setup_auto_commands(scratch)
     vim.api.nvim_create_autocmd({ "BufLeave", "BufWinLeave" }, {
         buffer = scratch.bufnr,
         once = false,
-        group = augroup,
+        group = MSGroup,
         callback = function() scratch:close_window() end
     })
 
     vim.api.nvim_create_autocmd({ "BufHidden" }, {
         buffer = scratch.bufnr,
         once = true,
-        group = augroup,
+        group = MSGroup,
         callback = function() scratch:close_window() end
     })
 
     vim.api.nvim_create_autocmd({ "WinClosed" }, {
         buffer = scratch.bufnr,
         once = false,
-        group = augroup,
+        group = MSGroup,
         callback = function()
             if scratch.windnr and not vim.api.nvim_win_is_valid(scratch.windnr) then
                 scratch.windnr = nil
             end
         end
     })
-
-    return augroup
 end
 
 ---@param scratch Scratch
@@ -218,34 +205,6 @@ function Scratch:clear()
     vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, true, {})
 end
 
----@param bufnr integer
----@param lspnr integer
-local function cleanup_lsp(bufnr, lspnr)
-    local bufs = vim.api.nvim_list_bufs()
-    local lsp_is_used_elsewere = false
-
-    if vim.lsp.buf_is_attached(bufnr, lspnr) then
-        vim.lsp.buf_detach_client(bufnr, lspnr)
-    end
-
-    for _, b in ipairs(bufs) do
-        if b ~= bufnr and vim.lsp.buf_is_attached(b, lspnr) then
-            lsp_is_used_elsewere = true
-            break
-        end
-    end
-
-
-    if not lsp_is_used_elsewere then
-        vim.lsp.stop_client(lspnr, false)
-        if not Utils.wait_until(function() return vim.lsp.client_is_stopped(lspnr) end) then
-            error("Unable to stop client!")
-            return
-        end
-    end
-
-end
-
 
 ---@param bufnr integer
 local function cleanup_portals(bufnr)
@@ -260,46 +219,47 @@ local function cleanup_portals(bufnr)
     end
 end
 
-
 function Scratch:destroy()
 
-    pcall(vim.api.nvim_clear_autocmds, { group = self.augroup })
-    pcall(vim.api.nvim_del_augroup_by_id, self.augroup)
+    pcall(vim.api.nvim_clear_autocmds, { group = MSGroup })
+    pcall(vim.api.nvim_del_augroup_by_id, MSGroup)
 
     cleanup_portals(self.bufnr)
     self.windnr = nil
 
     vim.treesitter.stop(self.bufnr)
 
-    cleanup_lsp(self.bufnr, self.lspnr)
-    for _, v in ipairs(vim.lsp.get_clients({ bufnr = self.bufnr })) do
-        cleanup_lsp(self.bufnr, v.id)
-    end
+    Msp:stop_lsp(self.bufnr)
 
     local clean = Utils.wait_until(function()
-        local open_portals = #vim.fn.win_findbuf(self.bufnr) ~= 0
-        local lsp_attached = vim.lsp.buf_is_attached(self.bufnr, self.lspnr)
-        local aug_exists = pcall(vim.api.nvim_get_autocmds, { group = self.augroup })
+        local no_open_portals = #vim.fn.win_findbuf(self.bufnr) == 0
+        local lsp_not_attached = Msp:validate(self.bufnr, { stopped = true })
+        local aug_is_ok = pcall(vim.api.nvim_get_autocmds, { group = MSGroup })
 
-        return not open_portals and not lsp_attached and not aug_exists
+        -- vim.notify(
+        --     ("windows: %s | lsp: %s | aug: %s")
+        --         :format(Utils.tostrings(no_open_portals, lsp_not_attached, not aug_is_ok)),
+        --     3)
+
+        return no_open_portals and lsp_not_attached and not aug_is_ok
     end)
 
-
-    if clean then
-        if vim.api.nvim_buf_is_valid(self.bufnr) then
-            vim.bo[self.bufnr].buflisted = false
-            vim.api.nvim_buf_delete(self.bufnr, { force = true })
-        end
-
-        self.lspnr = -1
-        self.bufnr = -1
-        self.augroup = -1
-        self.initialized = false
-    else
+    if not clean then
         error("unable to delete buffer: " .. self.bufnr)
     end
 
+    if vim.api.nvim_buf_is_valid(self.bufnr) then
+        vim.bo[self.bufnr].buflisted = false
+        vim.api.nvim_buf_delete(self.bufnr, { force = true })
+    end
 
+    assert(Utils.wait_until(function()
+        return not vim.api.nvim_buf_is_valid(self.bufnr)
+    end))
+
+    self.lspnr = -1
+    self.initialized = false
+    self.bufnr = -1
 end
 
 function Scratch:setup()
@@ -311,10 +271,10 @@ function Scratch:setup()
 
     self.bufnr = create_buffer()
     self.lspnr = attach_tree_lsp(self.bufnr)
-    self.augroup = setup_auto_commands(self)
+    setup_auto_commands(self)
+    setup_user_commands(self)
     self.initialized = true
 
-    setup_user_commands(self)
 
     assert(self:validate(), "End of setup")
 end
@@ -333,6 +293,5 @@ return Scratch.new()
     - better error handling
     - save to a file
 
-    - Use a temp file instead?
-
 --]]
+
