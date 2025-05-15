@@ -1,8 +1,3 @@
-package.loaded["mark-scratch.winbuf"] = nil
-package.loaded["mark-scratch.utils"] = nil
-package.loaded["mark-scratch.lsp"] = nil
--- package.loaded['mark-scratch.augroup'] = nil
-
 local Winbuf = require("mark-scratch.winbuf")
 local Utils = require("mark-scratch.utils")
 local MSGroup = require("mark-scratch.augroup")
@@ -97,6 +92,7 @@ local function create_buffer()
     count = count + 1
     local name = "[Note" .. "|" .. count .. "|" .. os.time() .. "|" .. math.random(1000) .. "].md"
 
+    -- TODO: Use scratch option when creating buffer
     local bufnr = Winbuf
         :new({ name = name })
         :bufopt({
