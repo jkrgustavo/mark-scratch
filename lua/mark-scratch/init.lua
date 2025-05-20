@@ -2,11 +2,14 @@ local Winbuf = require("mark-scratch.winbuf")
 local Utils = require("mark-scratch.utils")
 local MSGroup = require("mark-scratch.augroup")
 local Msp = require('mark-scratch.lsp')
+local Logg = require('mark-scratch.logger')
+local Config = require('mark-scratch.config')
 
 ---@class Scratch
 ---@field bufnr integer
 ---@field initialized boolean
 ---@field windnr integer | nil
+---@field config ms.config
 local Scratch = {}
 
 Scratch.__index = Scratch
@@ -16,6 +19,7 @@ function Scratch.new()
         bufnr = -1,
         windnr = nil,
         initialized = false,
+        config = Config.default_config
     }, Scratch)
 end
 
@@ -62,7 +66,7 @@ end
 local function attach_tree_lsp(bufnr)
 
     if not vim.api.nvim_buf_is_valid(bufnr) then
-        error("Bufnr is invalid or group == -1, in 'attach_tree_lsp'")
+        Logg:log("[scratch.attachtreelsp] " .. "Invalid bufnr")
         return -1
     end
 
@@ -102,6 +106,9 @@ local function create_buffer()
             ['filetype'] = 'scratchmarkdown'
         })
         :bufinfo()
+
+    Logg:log("[scratch.createbuffer] "
+        .. ("created buffer %d with name: '%s'"):format(bufnr, name))
 
     return bufnr
 end
@@ -173,10 +180,13 @@ function Scratch:open_window()
             ['conceallevel'] = 2
         })
         :wininfo()
+
+    Logg:log("[scratch.openwin] " .. "Opened scratch window")
 end
 
 function Scratch:close_window()
     if not self.windnr or not vim.api.nvim_win_is_valid(self.windnr) then
+        Logg:log("[scratch.closewindow] " .. "window wasn't valid")
         self.windnr = nil
         return
     end
@@ -184,12 +194,13 @@ function Scratch:close_window()
     local winid = self.windnr or -1
     local ok, err = pcall(vim.api.nvim_win_close, winid, false)
     if not ok then
-        vim.print('close_window(): ' .. err)
+        Logg:log("[scratch.closewindow] " .. "Error closing window: " .. err)
         return
     end
 
     vim.schedule(function()
         if not vim.api.nvim_win_is_valid(winid) then
+            Logg:log("[scratch.closewindow] " .. "Closing window")
             self.windnr = nil
         end
     end)
@@ -209,13 +220,19 @@ local function cleanup_portals(bufnr)
         for _, p in ipairs(buf_portals) do
             local ok, err = pcall(vim.api.nvim_win_close, p, true)
             if not ok then
-                vim.print("Not ok while cleaning up portals:" .. vim.inspect(err))
+                Logg:log("[scratch.cleanupportals] " .. "Error while calling win_close: " .. err)
             end
         end
     end
 end
 
 function Scratch:destroy()
+    if not self.initialized then
+        Logg:log('[scratch.destroy] ', "Tried to destroy while 'self.initialized' was false")
+        return
+    end
+
+    Logg:log("[scratch.destroy] " .. "Destroying scratch")
 
     pcall(vim.api.nvim_clear_autocmds, { group = MSGroup })
     pcall(vim.api.nvim_del_augroup_by_id, MSGroup)
@@ -232,15 +249,16 @@ function Scratch:destroy()
         local lsp_not_attached = Msp:validate(self.bufnr, { stopped = true })
         local aug_is_ok = pcall(vim.api.nvim_get_autocmds, { group = MSGroup })
 
-        -- vim.notify(
-        --     ("windows: %s | lsp: %s | aug: %s")
-        --         :format(Utils.tostrings(no_open_portals, lsp_not_attached, not aug_is_ok)),
-        --     3)
+        if not no_open_portals and not lsp_not_attached and aug_is_ok then
+            Logg:log("[scratch.destroy] while waiting" .. ("windows: %s | lsp: %s | aug: %s")
+                 :format(Utils.tostrings(no_open_portals, lsp_not_attached, not aug_is_ok)))
+        end
 
         return no_open_portals and lsp_not_attached and not aug_is_ok
     end)
 
     if not clean then
+        Logg:log("[scratch.destroy] 'clean' was false", self)
         error("unable to delete buffer: " .. self.bufnr)
     end
 
@@ -253,17 +271,22 @@ function Scratch:destroy()
         return not vim.api.nvim_buf_is_valid(self.bufnr)
     end))
 
+    Logg:log("[scratch.destroy] " .. "Destroyed")
     self.lspnr = -1
     self.initialized = false
     self.bufnr = -1
 end
 
-function Scratch:setup()
+
+---@param config? ms.config.partial
+function Scratch:setup(config)
 
     if self.initialized then
-        vim.notify("Can't double initialize mark-scratch", vim.log.levels.INFO)
+        Logg:log("[scratch.setup] attempt to re-initialize", self)
         return
     end
+
+    self.config = vim.tbl_deep_extend('force', self.config, config)
 
     self.bufnr = create_buffer()
     self.lspnr = attach_tree_lsp(self.bufnr)

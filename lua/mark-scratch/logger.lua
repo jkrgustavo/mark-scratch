@@ -26,12 +26,14 @@ end
 
 function logger:log(...)
     local len = select('#', ...)
+    table.insert(self.lines, "----------------------------------------")
     for i = 1, len do
         local pulled = select(i, ...)
         local item = type(pulled) == 'table' and vim.inspect(pulled) or tostring(pulled)
 
         table.insert(self.lines, item)
     end
+    table.insert(self.lines, "----------------------------------------")
 
 end
 
@@ -41,8 +43,8 @@ end
 
 function logger:show()
     local plines = process_lines(self.lines)
-    local width = 50
-    local height = #plines > 75 and 75 or #plines
+    local width = 100
+    local height = #plines > 75 and 75 or #plines + 3
 
     local hw = width/2
     local hh = height/2
@@ -58,16 +60,10 @@ function logger:show()
             row = row,
             col = col,
         })
-        :winopt('wrap', true)
         :setlines(plines)
         :info()
 
     return bufnr, winid
-end
-
-function logger:_debug()
-
-
 end
 
 function logger:clear()
