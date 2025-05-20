@@ -111,5 +111,13 @@ function msp:start_lsp(bufnr, config)
     self.started = true
 end
 
+---@param config table | nil
+---@return msp
+function msp:new(config)
+    return setmetatable({
+        client = nil,
+        started = false,
+    }, msp)
+end
 
 return msp
