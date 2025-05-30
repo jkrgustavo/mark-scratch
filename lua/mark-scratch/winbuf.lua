@@ -40,63 +40,25 @@ local obj = {}
 obj.__index = obj
 
 
--- ---@param direction 'above'|'below'|'left'|'right'
--- ---@param vertical boolean
--- ---@return obj
--- function obj:split(direction, vertical)
---     local cfg = make_split_opts(direction, vertical)
---
---     self.winid = vim.api.nvim_open_win(self.bufnr, true, cfg)
---
---     return self
--- end
-
----@param cfg? vim.api.keyset.win_config
+---@param type? 'split' | 'float'
 ---@param existing? integer
 ---@return obj
-function obj:split(cfg, existing)
-    local wincfg = cfg and vim.tbl_deep_extend('force', make_split_opts(), cfg)
-        or make_split_opts()
+function obj:win(type, existing)
+
+    local typ = type or 'float'
+    local wincfg = typ == 'split' and make_split_opts() or make_floating_opts()
 
     if not vim.api.nvim_buf_is_valid(self.bufnr) then
-        vim.print("Invalid bufnr: " .. self.bufnr)
-    end
-
-    if existing then
-
-        self.winid = existing
-        if cfg then
-            local existing_cfg = vim.api.nvim_win_get_config(existing)
-            assert(existing_cfg.relative == cfg.relative, "Incompatable window and config")
-            vim.api.nvim_win_set_config(self.winid, wincfg)
-        end
-    else
-        self.winid = vim.api.nvim_open_win(self.bufnr, true, wincfg)
-    end
-
-    return self
-end
-
----@param cfg? vim.api.keyset.win_config
----@param existing? integer
----@return obj
-function obj:float(cfg, existing)
-    local wincfg = cfg and vim.tbl_deep_extend('force', make_floating_opts(), cfg)
-        or make_floating_opts()
-
-    if not vim.api.nvim_buf_is_valid(self.bufnr) then
-        vim.print("Invalid bufnr: " .. self.bufnr)
+        error("Invalid bufnr: " .. self.bufnr)
     end
 
     if existing then
         self.winid = existing
-        if cfg then
-            local existing_cfg = vim.api.nvim_win_get_config(existing)
-            assert(existing_cfg.relative == cfg.relative, "Incompatable window and config")
-            vim.api.nvim_win_set_config(self.winid, wincfg)
-        end
     else
-        self.winid = vim.api.nvim_open_win(self.bufnr, true, wincfg)
+        local winid = vim.api.nvim_open_win(self.bufnr, true, wincfg)
+        if winid == 0 then
+            error("Failed to open window")
+        end
     end
 
     return self
@@ -183,10 +145,19 @@ local count = 0
 function winbuf:new(opts)
     count = count + 1
 
-    local bufnr = opts.bufnr
-        or (opts.scratch
+    local bufnr = -1
+    if opts.bufnr then
+        assert(
+            vim.api.nvim_buf_is_valid(opts.bufnr),
+            "Invalid bufnr: " .. tostring(opts.bufnr))
+
+        bufnr = opts.bufnr
+    else
+        bufnr = opts.scratch
             and vim.api.nvim_create_buf(true, true)
-            or vim.api.nvim_create_buf(true, false))
+            or vim.api.nvim_create_buf(true, false)
+    end
+    assert(bufnr, "Failed to create bufnr")
 
     local name = opts.name or ('[winbuf | %d | %d]'):format(count, os.time())
     if not opts.bufnr then

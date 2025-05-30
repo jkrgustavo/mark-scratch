@@ -1,4 +1,1 @@
-local group = vim.api.nvim_create_augroup
-return group('mark-scratch', {})
-
-
+return vim.api.nvim_create_augroup('mark-scratch', {})

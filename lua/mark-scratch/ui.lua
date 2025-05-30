@@ -1,6 +1,7 @@
 local Winbuf = require('mark-scratch.winbuf')
 local Logg = require('mark-scratch.logger').logg
 local MSGroup = require('mark-scratch.augroup')
+local Utils = require('mark-scratch.utils')
 
 local FTYPE = "scratchmarkdown"
 
@@ -129,6 +130,7 @@ end
 function ui:open_window()
     if not self.initialized then
         Logg:log("Open window called while uninitialized")
+        return
     end
 
     if self.windnr and vim.api.nvim_win_is_valid(self.windnr) then
@@ -140,7 +142,8 @@ function ui:open_window()
     if cfg.wintype == 'float' then
         self.windnr = Winbuf
             :new({ bufnr = self.bufnr })
-            :float({
+            :win('float')
+            :winsetconf({
                 width = cfg.width,
                 height = cfg.height,
                 row = cfg.float_y,
@@ -154,7 +157,8 @@ function ui:open_window()
     elseif cfg.wintype == 'split' then
         self.windnr = Winbuf
             :new({ bufnr = self.bufnr })
-            :split({
+            :win('split')
+            :winsetconf({
                 split = cfg.split_direction,
                 vertical = cfg.vertical
             })
@@ -211,6 +215,14 @@ function ui:shutdown()
     if vim.api.nvim_buf_is_valid(self.bufnr) then
         vim.bo[self.bufnr].buflisted = false
         vim.api.nvim_buf_delete(self.bufnr, { force = true })
+    end
+
+    local shutdown = Utils.wait_until(function()
+        return not vim.api.nvim_buf_is_valid(self.bufnr)
+    end)
+
+    if not shutdown then
+        Logg:log("timeout waiting for 'buf_is_valid' to return false", self)
     end
 
     Logg:log("Finished destroying ui")

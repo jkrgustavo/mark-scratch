@@ -113,7 +113,7 @@ end
 
 function logger:show()
     local plines = process_lines(self.lines)
-    local height = #plines > 75 and 75 or #plines + 3
+    local height = #plines > vim.o.lines and vim.o.lines or #plines + 3
 
     local hw = M.width/2
     local hh = height/2
@@ -123,7 +123,8 @@ function logger:show()
     local bufnr, winid = winbuf
         :new({ scratch = true })
         :bufopt('bufhidden', 'wipe')
-        :float({
+        :win('float')
+        :winsetconf({
             relative = 'editor',
             width = M.width,
             height = height,

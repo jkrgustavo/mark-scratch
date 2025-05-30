@@ -46,7 +46,6 @@ function msp:validate(bufnr, opt)
             and not self.client:is_stopped()
             or false
     elseif opt.stopped then
-
         local cli_is_stopped = self.client:is_stopped()
         local no_clients_attached = true
         for _, v in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
@@ -98,7 +97,6 @@ function msp:stop_lsp(bufnr)
                 ok = v[1]:is_stopped()
             else
                 Logg:log("Invalid 'stat': " .. v[2] .. ", shouldn't be possible")
-                error('Unable to stop lsp')
             end
         end
 
@@ -110,7 +108,6 @@ function msp:stop_lsp(bufnr)
         Logg:log("Finished shutting down lsp")
     else
         Logg:log("'done' was false")
-        error("Couldn't finish stopping lsp")
     end
 
     return done
@@ -131,7 +128,10 @@ function msp:start_lsp(bufnr, config)
     end
 
     local lspnr = vim.lsp.start(config, { bufnr = bufnr })
-    assert(lspnr, "Unable to start lsp!")
+    if not lspnr then
+        Logg:log("Couldn't start the lsp", self)
+        error("Unable to start lsp server")
+    end
 
     vim.schedule(function()
         Utils.wait_until(function()

@@ -1,4 +1,3 @@
-local Winbuf = require("mark-scratch.winbuf")
 local Utils = require("mark-scratch.utils")
 local MSGroup = require("mark-scratch.augroup")
 local Msp = require('mark-scratch.lsp')
@@ -6,8 +5,6 @@ local Logg = require('mark-scratch.logger').logg
 local Config = require('mark-scratch.config')
 local Ui = require('mark-scratch.ui')
 
---    ---@field bufnr integer
---    ---@field windnr integer | nil
 ---@class Scratch
 ---@field initialized boolean
 ---@field config ms.config
@@ -62,9 +59,6 @@ function Scratch:validate(silent)
     return true
 end
 
-
-
-
 function Scratch:destroy()
     if not self.initialized then
         Logg:log("Tried to destroy while 'self.initialized' was false")
@@ -98,7 +92,7 @@ function Scratch:destroy()
 
     if not clean then
         Logg:log("'clean' was false", self)
-        error("unable to delete buffer: " .. bufnr)
+        error("unable cleanup resources")
     end
 
     assert(Utils.wait_until(function()
@@ -108,7 +102,6 @@ function Scratch:destroy()
     Logg:log("Destroyed")
     self.initialized = false
 end
-
 
 ---@param config? ms.config.partial
 function Scratch:setup(config)
@@ -139,10 +132,10 @@ return Scratch.new()
 --[[ TODO:
 
     - better config
-    - better error handling
     - save to a file
-    -- /tmp file, associate with each cwd
-    - lsp part of ui
+        - /tmp file, associate with each cwd
+    - move lsp to be part of ui
+    - actual tests
 
 --]]
 
