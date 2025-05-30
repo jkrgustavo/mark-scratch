@@ -1,10 +1,17 @@
 package.loaded['mark-scratch.winbuf'] = nil
 local winbuf = require('mark-scratch.winbuf')
 
----@class logger
----@field lines string[]
-local logger = {}
-logger.__index = logger
+local M = {}
+
+---@enum ms.log.levels
+M.log_levels = {
+    DISABLED = 0,
+    TRACE = 1,
+    DEBUG = 2,
+}
+
+M.width = 100
+
 
 ---@param lines string[]
 local function process_lines(lines)
@@ -16,24 +23,87 @@ local function process_lines(lines)
         table.insert(res, l)
     end
 
-    -- first captures a single line not containing any newlines
-    -- second captures the final line of a string with newlines, 
+    -- captures a single line not containing any newlines
     table.insert(res, s:match('^([^\n]*)$'))
+    -- captures the final line of a string with newlines, 
     table.insert(res, s:match('\n([^\n]*)$'))
 
     return res
 end
 
+---@param lvl ms.log.levels
+---@param txt string[]
+---@return string[]
+local function add_debug_info(txt, lvl)
+
+    local ret = {}
+    if lvl == M.log_levels.TRACE then
+
+        local dbg = debug.getinfo(3, 'nS')
+        local fnname = dbg.name or "anonymous"
+        local info = ("[%s.%s]"):format(dbg.short_src, fnname)
+
+        local pad = math.max(M.width - #info, 0)
+        local left = math.floor(pad / 2)
+        local right = pad - left
+        local title = string.rep('-', left) .. info .. string.rep('-', right)
+
+        ret = vim.tbl_extend('force', ret, txt)
+        table.insert(ret, 1, title)
+    elseif lvl == M.log_levels.DEBUG then
+        local dbg = debug.getinfo(3, 'nSl')
+
+        local data = {}
+        for k, v in pairs(dbg) do
+            if k ~= "source" then
+                table.insert(data, ("| %s: %s |"):format(k, v))
+            end
+        end
+
+        ret = vim.tbl_deep_extend('keep', ret, txt)
+        for i, v in ipairs(data) do
+            table.insert(ret, i, v)
+        end
+        table.insert(ret, 1, string.rep('-', M.width))
+    end
+
+
+    return ret
+end
+
+---@class logger
+---@field lines string[]
+---@field level ms.log.levels
+local logger = {}
+logger.__index = logger
+
+local function init()
+    return setmetatable({
+        lines = {},
+        level = M.log_levels.TRACE
+    }, logger)
+end
+
 function logger:log(...)
+    if self.level == M.log_levels.DISABLED then
+        return
+    end
+
     local len = select('#', ...)
-    table.insert(self.lines, "----------------------------------------")
+
+    local tmp = {}
     for i = 1, len do
         local pulled = select(i, ...)
         local item = type(pulled) == 'table' and vim.inspect(pulled) or tostring(pulled)
 
-        table.insert(self.lines, item)
+        table.insert(tmp, item)
     end
-    table.insert(self.lines, "----------------------------------------")
+
+    tmp = add_debug_info(tmp, self.level)
+
+    for _, v in ipairs(tmp) do
+        table.insert(self.lines, v)
+    end
 
 end
 
@@ -43,19 +113,19 @@ end
 
 function logger:show()
     local plines = process_lines(self.lines)
-    local width = 100
     local height = #plines > 75 and 75 or #plines + 3
 
-    local hw = width/2
+    local hw = M.width/2
     local hh = height/2
     local row = math.floor(((vim.o.lines / 2) - hh) - 1)
     local col = math.floor((vim.o.columns / 2) - hw)
 
-    local bufnr, winid = winbuf:new({ scratch = true })
+    local bufnr, winid = winbuf
+        :new({ scratch = true })
         :bufopt('bufhidden', 'wipe')
         :float({
             relative = 'editor',
-            width = width,
+            width = M.width,
             height = height,
             row = row,
             col = col,
@@ -70,13 +140,13 @@ function logger:clear()
     self.lines = {}
 end
 
-local function init()
-    return setmetatable({
-        lines = {},
-    }, logger)
+---@param lvl ms.log.levels
+function logger:set_level(lvl)
+    self.level = lvl
 end
 
+-- TODO: Update logg sites with 'require("mark-scratch.logger").logg'
 ---@type logger
-local logg = init()
+M.logg = init()
 
-return logg
+return M

@@ -1,4 +1,23 @@
 local Utils = require('mark-scratch.utils')
+local Logg = require('mark-scratch.logger').logg
+
+---@param bufnr integer
+---@return vim.lsp.ClientConfig
+local function default_cli_config(bufnr)
+    ---@type vim.lsp.ClientConfig
+    return {
+        name = "scratch-marksman",
+        cmd = { 'marksman', 'server' },
+        workspace_folders = nil,
+        root_dir = vim.fn.getcwd(),
+        filetypes = { "scratchmarkdown" },
+        on_attach = function (client)
+            if client.server_capabilities.semanticTokensProvider then
+                vim.lsp.semantic_tokens.start(bufnr, client.id)
+            end
+        end
+    }
+end
 
 ---@class msp
 ---@field client? vim.lsp.Client
@@ -39,6 +58,8 @@ function msp:validate(bufnr, opt)
             and no_clients_attached
     end
 
+    if not valid then Logg:log("Failed to validate: ", self) end
+
     return valid
 end
 
@@ -76,26 +97,38 @@ function msp:stop_lsp(bufnr)
             elseif v[2] == 'stopped' then -- make sure it stopped
                 ok = v[1]:is_stopped()
             else
-                error('invalid "stat" value: ' .. v[2] .. ', from inside "stop_lsp"')
+                Logg:log("Invalid 'stat': " .. v[2] .. ", shouldn't be possible")
+                error('Unable to stop lsp')
             end
         end
 
         return ok
     end)
 
-    if done then self.started = false else error('not done!') end
+    if done then
+        self.started = false
+        Logg:log("Finished shutting down lsp")
+    else
+        Logg:log("'done' was false")
+        error("Couldn't finish stopping lsp")
+    end
 
     return done
 end
 
 
----@param config vim.lsp.ClientConfig
----@param bufnr? integer
+---@param bufnr integer
+---@param config? vim.lsp.ClientConfig
 function msp:start_lsp(bufnr, config)
     if self.started then return end
 
-    bufnr = bufnr or 0
-    assert(vim.api.nvim_buf_is_valid(bufnr))
+    config = config
+        and vim.tbl_deep_extend('force', default_cli_config(bufnr), config)
+        or default_cli_config(bufnr)
+
+    if not vim.api.nvim_buf_is_valid(bufnr) then
+        Logg:log("Invalid bufnr: ", bufnr)
+    end
 
     local lspnr = vim.lsp.start(config, { bufnr = bufnr })
     assert(lspnr, "Unable to start lsp!")
@@ -108,12 +141,21 @@ function msp:start_lsp(bufnr, config)
 
     self.client = vim.lsp.get_client_by_id(lspnr)
 
+    ---@diagnostic disable-next-line: param-type-mismatch
+    vim.treesitter.query.set('markdown', 'highlights', nil) -- nil resets the explicit query from lspsaga
+    vim.treesitter.language.register('markdown', 'scratchmarkdown')
+    vim.treesitter.language.add('markdown')
+    vim.treesitter.start(bufnr, 'markdown')
+
     self.started = true
+
+    Logg:log("Lsp started", config)
 end
 
 ---@param config table | nil
 ---@return msp
-function msp:new(config)
+function msp.new(config)
+    Logg:log("Creating new msp", config)
     return setmetatable({
         client = nil,
         started = false,
