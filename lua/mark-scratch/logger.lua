@@ -146,8 +146,12 @@ function logger:set_level(lvl)
     self.level = lvl
 end
 
--- TODO: Update logg sites with 'require("mark-scratch.logger").logg'
 ---@type logger
 M.logg = init()
+
+vim.api.nvim_create_user_command('LGClear', function() M.logg:clear() end, { desc = "clear logs"})
+
+
+vim.api.nvim_create_user_command("LGShow", function() M.logg:show() end, { desc = "Display logs"})
 
 return M

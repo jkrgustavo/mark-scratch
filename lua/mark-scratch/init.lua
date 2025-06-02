@@ -123,6 +123,13 @@ function Scratch:setup(config)
         self:destroy()
     end, { desc = "Destroy a buffer" })
 
+    vim.api.nvim_create_autocmd({ "VimLeavePre"}, {
+        buffer = self.ui.bufnr,
+        group = MSGroup,
+        once = true,
+        callback = function() self:destroy() end,
+    })
+
 
     assert(self:validate(), "End of setup")
 end

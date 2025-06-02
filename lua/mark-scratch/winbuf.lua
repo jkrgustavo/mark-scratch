@@ -59,6 +59,7 @@ function obj:win(type, existing)
         if winid == 0 then
             error("Failed to open window")
         end
+        self.winid = winid
     end
 
     return self

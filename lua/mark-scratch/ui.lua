@@ -28,35 +28,27 @@ end
 ---@param mui Ui
 local function make_commands(mui)
 
-    vim.api.nvim_create_autocmd({ "VimLeavePre"}, {
-        buffer = mui.bufnr,
-        group = MSGroup,
-        once = true,
-        callback = function() mui:shutdown() end
-    })
-
-    vim.api.nvim_create_autocmd({ "BufLeave", "BufWinLeave" }, {
+    vim.api.nvim_create_autocmd({ "BufLeave" }, {
         buffer = mui.bufnr,
         once = false,
         group = MSGroup,
-        callback = function() mui:close_window() end
-    })
-
-    vim.api.nvim_create_autocmd({ "BufHidden" }, {
-        buffer = mui.bufnr,
-        once = true,
-        group = MSGroup,
-        callback = function() mui:close_window() end
+        callback = function(e)
+            if mui.config.close_on_leave then
+                Logg:log("Callback triggered: ", e)
+                mui:close_window()
+            end
+        end
     })
 
     vim.api.nvim_create_autocmd({ "WinClosed" }, {
         buffer = mui.bufnr,
         once = false,
         group = MSGroup,
-        callback = function()
+        callback = function(e)
             if mui.windnr and not vim.api.nvim_win_is_valid(mui.windnr) then
                 mui.windnr = nil
             end
+            Logg:log("Callback triggered: ", e)
         end
     })
 
@@ -73,9 +65,6 @@ local function make_commands(mui)
         mui:close_window()
     end, { desc = "Close scratch window"})
 
-    vim.api.nvim_create_user_command("MSLogg", function()
-        Logg:show()
-    end, { desc = "Close scratch window"})
 
     Logg:log("user/autocommands setup")
 
