@@ -46,7 +46,13 @@ function msp:validate(bufnr, opt)
             and not self.client:is_stopped()
             or false
     elseif opt.stopped then
-        local cli_is_stopped = self.client:is_stopped()
+        local cli_is_stopped
+        if not self.client then
+            cli_is_stopped = true
+        else
+            cli_is_stopped = self.client:is_stopped()
+        end
+
         local no_clients_attached = true
         for _, v in ipairs(vim.lsp.get_clients({ bufnr = bufnr })) do
             if not v._is_stopping then no_clients_attached = false end

@@ -1,4 +1,3 @@
-package.loaded['mark-scratch.winbuf'] = nil
 local winbuf = require('mark-scratch.winbuf')
 
 local M = {}
@@ -109,6 +108,10 @@ end
 
 function logger:print()
     vim.print(table.concat(self.lines, '\n'))
+end
+
+function logger:get_lines()
+    return vim.deepcopy(self.lines, false)
 end
 
 function logger:show()

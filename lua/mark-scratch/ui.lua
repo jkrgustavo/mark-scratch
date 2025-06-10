@@ -45,8 +45,12 @@ local function make_commands(mui)
         once = false,
         group = MSGroup,
         callback = function(e)
-            if mui.windnr and not vim.api.nvim_win_is_valid(mui.windnr) then
-                mui.windnr = nil
+            if mui.windnr then
+                if vim.api.nvim_win_is_valid(mui.windnr) then
+                    mui:close_window()
+                else
+                    mui.windnr = nil
+                end
             end
             Logg:log("Callback triggered: ", e)
         end
@@ -98,12 +102,23 @@ local function init(u)
 end
 
 function ui:validate()
-    local wvalid = self.windnr and vim.api.nvim_win_is_valid(self.windnr) or true
+    local valid = self.initialized
+        and (not self.windnr or vim.api.nvim_win_is_valid(self.windnr))
+        and vim.api.nvim_buf_is_valid(self.bufnr)
 
-    return self.initialized and wvalid and vim.api.nvim_buf_is_valid(self.bufnr)
+    if not valid then
+        Logg:log(
+            "validate failed:",
+            self.initialized,
+            self.windnr,
+            self.windnr and vim.api.nvim_win_is_valid(self.windnr) or false,
+            vim.api.nvim_buf_is_valid(self.bufnr))
+    end
+
+    return valid
 end
 
----@param config ms.config.partial.window
+---@param config? ms.config.partial.window
 ---
 function ui:setup(config)
     Logg:log("Changed from default config", config)
@@ -168,7 +183,7 @@ function ui:close_window()
         return
     end
 
-    local winid = self.windnr or -1
+    local winid = self.windnr or -1 -- to make lua_ls relax
     local ok, err = pcall(vim.api.nvim_win_close, winid, false)
     if not ok then
         Logg:log("Errror while closing window: ", err)
@@ -220,6 +235,11 @@ function ui:shutdown()
 end
 
 function ui:set_contents(lines)
+    if not vim.api.nvim_buf_is_valid(self.bufnr) then
+        error("Invalid buffer")
+        Logg:log("Tried to set contents on an invalid buffer", lines)
+    end
+
     vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
 end
 

@@ -140,9 +140,7 @@ return Scratch.new()
 
     - better config
     - save to a file
-        - /tmp file, associate with each cwd
     - move lsp to be part of ui
-    - actual tests
 
 --]]
 

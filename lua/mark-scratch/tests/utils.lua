@@ -1,5 +1,3 @@
-local Plenary = require('plenary.path')
-
 ---@class stub
 ---@field restores {[string]: fun(nil): nil}
 ---@field originals {[string]: fun(any): any} 
@@ -78,7 +76,7 @@ end
 ---@param subset table
 ---@param superset table
 ---@return boolean
-function M.tbl_subset(subset, superset)
+function M.is_subset(subset, superset)
     if type(subset) ~= "table" or type(superset) ~= "table" then
         return subset == superset
     end
