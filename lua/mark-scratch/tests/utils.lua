@@ -110,4 +110,12 @@ function M.wincfg_equal(expected, actual)
     return M.tbl_subset(expected, actual)
 end
 
+function M.key(k)
+    vim.api.nvim_feedkeys(
+        vim.api.nvim_replace_termcodes(k, true, false, true),
+        "x",
+        true
+    )
+end
+
 return M

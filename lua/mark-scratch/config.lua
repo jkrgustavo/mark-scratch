@@ -51,10 +51,10 @@ M.default_config = {
 
     keybinds = {   -- TODO: Actually setup keybinds
         open_scratch = '<leader>ms',
-        float_up    = '<C-Up>',
-        float_down  = '<C-Down>',
-        float_left  = '<C-Left>',
-        float_right = '<C-Right>',
+        float_up    = '<leader><Up>',
+        float_down  = '<leader><Down>',
+        float_left  = '<leader><Left>',
+        float_right = '<leader><Right>',
     },
 
     window = {

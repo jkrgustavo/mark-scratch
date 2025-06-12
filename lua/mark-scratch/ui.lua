@@ -5,24 +5,68 @@ local Utils = require('mark-scratch.utils')
 
 local FTYPE = "scratchmarkdown"
 
+---@class winstate
+---@field x integer
+---@field y integer
+
+---@param cfg ms.config
+---@return Ui
+local function data_setup(cfg)
+    local instance = {
+        bufnr = -1,
+        windnr = nil,
+        config = cfg,
+        initialized = false,
+    }
+    instance.__data = {
+        x = cfg.window.float_x,
+        y = cfg.window.float_y
+    }
+    instance.state = setmetatable({}, {
+        __index = function(_, k)
+            local ret = instance.__data[k]
+            Logg:log("index called", k, ret)
+            return ret
+        end,
+        __newindex = function(_, k, v)
+            Logg:log("newindex called: " .. k .. ' ' .. tostring(v))
+            if not instance.__data[k] then
+                Logg:log("Tried to set invalid ui state", k, v)
+                error(("invalid entry '%s'"):format(k))
+            else
+                instance.__data[k] = v
+                if instance.windnr then
+                    Logg:log("updating winconfig too")
+                    vim.api.nvim_win_set_config(instance.windnr, {
+                        relative = 'editor',
+                        row = instance.__data.y,
+                        col = instance.__data.x
+                    })
+                end
+            end
+
+        end
+    })
+
+    return instance
+end
+
 ---@class Ui
 ---@field bufnr integer
 ---@field windnr integer | nil
----@field config ms.config.window
+---@field config ms.config
 ---@field initialized boolean
+---@field state winstate
+---@field private __data winstate
 local ui = {}
 ui.__index = ui
 
----@param config ms.config.window
+---@param default_config ms.config
 ---@return Ui
-function ui.new(config)
+function ui.new(default_config)
+    local data = data_setup(default_config)
 
-    return setmetatable({
-        bufnr = -1,
-        windnr = nil,
-        config = config,
-        initialized = false,
-    }, ui)
+    return setmetatable(data, ui)
 end
 
 ---@param mui Ui
@@ -33,7 +77,7 @@ local function make_commands(mui)
         once = false,
         group = MSGroup,
         callback = function(e)
-            if mui.config.close_on_leave then
+            if mui.config.window.close_on_leave then
                 Logg:log("Callback triggered: ", e)
                 mui:close_window()
             end
@@ -56,21 +100,37 @@ local function make_commands(mui)
         end
     })
 
-
     vim.api.nvim_create_user_command("MSOpen", function()
         mui:open_window()
-    end, { desc = "Open scratch window"})
+    end, { desc = "Open scratch window" })
 
     vim.api.nvim_create_user_command("MSClear", function()
         mui:set_contents({})
-    end, { desc = "Clear scratch window"})
+    end, { desc = "Clear scratch window" })
 
     vim.api.nvim_create_user_command("MSClose", function()
         mui:close_window()
-    end, { desc = "Close scratch window"})
+    end, { desc = "Close scratch window" })
 
 
     Logg:log("user/autocommands setup")
+
+end
+
+---@param u Ui
+local function make_keybinds(u)
+    vim.keymap.set('n', u.config.keybinds.float_up, function()
+        u.state.y = u.state.y - 5
+    end)
+    vim.keymap.set('n', u.config.keybinds.float_down, function()
+        u.state.y = u.state.y + 5
+    end)
+    vim.keymap.set('n', u.config.keybinds.float_left, function()
+        u.state.x = u.state.x - 5
+    end)
+    vim.keymap.set('n', u.config.keybinds.float_right, function()
+        u.state.x = u.state.x + 5
+    end)
 
 end
 
@@ -96,6 +156,7 @@ local function init(u)
         "id: " .. tostring(u.bufnr))
 
     make_commands(u)
+    make_keybinds(u)
 
     u.initialized = true
     Logg:log("Initialied ui")
@@ -118,8 +179,7 @@ function ui:validate()
     return valid
 end
 
----@param config? ms.config.partial.window
----
+---@param config? ms.config.partial
 function ui:setup(config)
     Logg:log("Changed from default config", config)
 
@@ -142,7 +202,7 @@ function ui:open_window()
         return
     end
 
-    local cfg = self.config
+    local cfg = self.config.window
     if cfg.wintype == 'float' then
         self.windnr = Winbuf
             :new({ bufnr = self.bufnr })
@@ -150,8 +210,8 @@ function ui:open_window()
             :winsetconf({
                 width = cfg.width,
                 height = cfg.height,
-                row = cfg.float_y,
-                col = cfg.float_x,
+                row = self.state.y,
+                col = self.state.x,
             })
             :winopt({
                 ['wrap'] = true,
@@ -190,12 +250,8 @@ function ui:close_window()
         return
     end
 
-    vim.schedule(function()
-        if not vim.api.nvim_win_is_valid(winid) then
-            Logg:log("closing the window")
-            self.windnr = nil
-        end
-    end)
+    Logg:log("closing the window")
+    self.windnr = nil
 
 end
 
@@ -244,3 +300,6 @@ function ui:set_contents(lines)
 end
 
 return ui
+
+-- TODO: Don't support multiple instances
+-- TODO: Flesh out winstate more

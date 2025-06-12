@@ -21,7 +21,7 @@ function Scratch.new()
         initialized = false,
         config = config,
         lsp = Msp.new(config),
-        ui = Ui.new(config.window)
+        ui = Ui.new(config)
     }, Scratch)
 end
 
@@ -115,7 +115,7 @@ function Scratch:setup(config)
 
     self.config = vim.tbl_deep_extend('force', self.config, config)
 
-    self.ui:setup(config.window)
+    self.ui:setup(config)
     self.lsp:start_lsp(self.ui.bufnr)
     self.initialized = true
 
@@ -141,6 +141,8 @@ return Scratch.new()
     - better config
     - save to a file
     - move lsp to be part of ui
+    - Convert to a singleton
+    - Refactor
 
 --]]
 
