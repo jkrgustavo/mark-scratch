@@ -46,10 +46,7 @@ local height = 50
 ---@field window ms.config.window
 M.default_config = {
 
-    -- TODO:
-    -- Top-level split or relative to current window
-
-    keybinds = {   -- TODO: Actually setup keybinds
+    keybinds = {
         open_scratch = '<leader>ms',
         float_up    = '<leader><Up>',
         float_down  = '<leader><Down>',

@@ -132,6 +132,10 @@ local function make_keybinds(u)
         u.state.x = u.state.x + 5
     end)
 
+    vim.keymap.set('n', u.config.keybinds.open_scratch, function()
+        u:open_window()
+    end)
+
 end
 
 local count = 0
@@ -300,6 +304,3 @@ function ui:set_contents(lines)
 end
 
 return ui
-
--- TODO: Don't support multiple instances
--- TODO: Flesh out winstate more

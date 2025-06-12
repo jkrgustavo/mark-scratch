@@ -141,8 +141,10 @@ return Scratch.new()
     - better config
     - save to a file
     - move lsp to be part of ui
-    - Convert to a singleton
+    - Convert modules to singletons
     - Refactor
+    - Top-level split or relative to current window
+    - Flesh out winstate more
 
 --]]
 

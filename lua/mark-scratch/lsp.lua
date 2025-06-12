@@ -169,5 +169,3 @@ function msp.new(config)
 end
 
 return msp
-
--- TODO: Don't support multiple instances
