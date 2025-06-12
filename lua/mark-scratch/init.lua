@@ -135,16 +135,3 @@ function Scratch:setup(config)
 end
 
 return Scratch.new()
-
---[[ TODO:
-
-    - better config
-    - save to a file
-    - move lsp to be part of ui
-    - Convert modules to singletons
-    - Refactor
-    - Top-level split or relative to current window
-    - Flesh out winstate more
-
---]]
-
