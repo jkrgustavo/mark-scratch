@@ -2,6 +2,8 @@ local Winbuf = require('mark-scratch.winbuf')
 local Logg = require('mark-scratch.logger').logg
 local MSGroup = require('mark-scratch.augroup')
 local Utils = require('mark-scratch.utils')
+local Config = require('mark-scratch.config')
+local Msp = require('mark-scratch.lsp')
 
 local FTYPE = "scratchmarkdown"
 
@@ -17,6 +19,7 @@ local function data_setup(cfg)
         windnr = nil,
         config = cfg,
         initialized = false,
+        lsp = Msp
     }
     instance.__data = {
         x = cfg.window.float_x,
@@ -51,23 +54,6 @@ local function data_setup(cfg)
     return instance
 end
 
----@class Ui
----@field bufnr integer
----@field windnr integer | nil
----@field config ms.config
----@field initialized boolean
----@field state winstate
----@field private __data winstate
-local ui = {}
-ui.__index = ui
-
----@param default_config ms.config
----@return Ui
-function ui.new(default_config)
-    local data = data_setup(default_config)
-
-    return setmetatable(data, ui)
-end
 
 ---@param mui Ui
 local function make_commands(mui)
@@ -161,15 +147,37 @@ local function init(u)
 
     make_commands(u)
     make_keybinds(u)
+    u.lsp:start_lsp(u.bufnr)
 
     u.initialized = true
     Logg:log("Initialied ui")
 end
 
+---@class Ui
+---@field lsp msp
+---@field bufnr integer
+---@field windnr integer | nil
+---@field config ms.config
+---@field initialized boolean
+---@field state winstate
+---@field private __data winstate
+local ui = {}
+ui.__index = ui
+
+---@return Ui
+local function new()
+    local data = data_setup(Config.default_config)
+
+    return setmetatable(data, ui)
+end
+
+local instance = new()
+
 function ui:validate()
     local valid = self.initialized
         and (not self.windnr or vim.api.nvim_win_is_valid(self.windnr))
         and vim.api.nvim_buf_is_valid(self.bufnr)
+        and self.lsp:validate(self.bufnr, { started = true })
 
     if not valid then
         Logg:log(
@@ -177,7 +185,8 @@ function ui:validate()
             self.initialized,
             self.windnr,
             self.windnr and vim.api.nvim_win_is_valid(self.windnr) or false,
-            vim.api.nvim_buf_is_valid(self.bufnr))
+            vim.api.nvim_buf_is_valid(self.bufnr),
+            self.lsp:validate(self.bufnr, { started = true }))
     end
 
     return valid
@@ -185,7 +194,11 @@ end
 
 ---@param config? ms.config.partial
 function ui:setup(config)
-    Logg:log("Changed from default config", config)
+    if config then Logg:log("Changed from default config", config) end
+
+    if self ~= instance then
+        self = instance
+    end
 
     config = config or {}
     self.config = vim.tbl_deep_extend('force', self.config, config)
@@ -196,8 +209,8 @@ function ui:setup(config)
 end
 
 function ui:open_window()
-    if not self.initialized then
-        Logg:log("Open window called while uninitialized")
+    if not self:validate() then
+        Logg:log("Open window called with invalid ui")
         return
     end
 
@@ -276,6 +289,11 @@ function ui:shutdown()
     end
     self.windnr = nil
 
+    self.lsp:stop_lsp(self.bufnr)
+    Utils.wait_until(function()
+        return self.lsp:validate(self.bufnr, { stopped = true })
+    end)
+
     if vim.api.nvim_buf_is_valid(self.bufnr) then
         vim.bo[self.bufnr].buflisted = false
         vim.api.nvim_buf_delete(self.bufnr, { force = true })
@@ -303,4 +321,5 @@ function ui:set_contents(lines)
     vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
 end
 
-return ui
+
+return instance

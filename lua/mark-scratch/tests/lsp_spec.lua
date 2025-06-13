@@ -6,7 +6,6 @@ local logger = require "mark-scratch.logger"
 local eq = assert.are.same
 
 describe("Mark-scratch LSP", function()
-    local lsp_instance
     local test_bufnr
 
     before_each(function()
@@ -22,11 +21,11 @@ describe("Mark-scratch LSP", function()
 
     after_each(function()
         -- Clean up LSP if started
-        if lsp_instance and lsp_instance.started then
-            lsp_instance:stop_lsp(test_bufnr)
+        if msp and msp.started then
+            msp:stop_lsp(test_bufnr)
             -- Wait for cleanup
             Utils.wait_until(function()
-                return not lsp_instance.started
+                return not msp.started
             end)
         end
 
@@ -39,27 +38,21 @@ describe("Mark-scratch LSP", function()
     end)
 
     it("creates new msp instance correctly", function()
-        lsp_instance = msp.new()
-
-        eq(lsp_instance.started, false)
-        eq(lsp_instance.client, nil)
-        eq(type(lsp_instance.start_lsp), "function")
-        eq(type(lsp_instance.stop_lsp), "function")
+        eq(msp.started, false)
+        eq(msp.client, nil)
+        eq(type(msp.start_lsp), "function")
+        eq(type(msp.stop_lsp), "function")
     end)
 
     it("validates correctly when not started", function()
-        lsp_instance = msp.new()
-
         -- Should be invalid when checking for started state
-        eq(lsp_instance:validate(test_bufnr, { started = true }), false)
+        eq(msp:validate(test_bufnr, { started = true }), false)
 
         -- Should be valid when checking for stopped state
-        eq(lsp_instance:validate(test_bufnr, { stopped = true }), true)
+        eq(msp:validate(test_bufnr, { stopped = true }), true)
     end)
 
     it("starts and stops LSP", function()
-        lsp_instance = msp.new()
-
         -- Check if marksman is available
         local has_marksman = vim.fn.executable('marksman') == 1
         if not has_marksman then
@@ -68,22 +61,22 @@ describe("Mark-scratch LSP", function()
         end
 
         -- Start LSP
-        lsp_instance:start_lsp(test_bufnr)
+        msp:start_lsp(test_bufnr)
 
         -- Wait for LSP to be attached
         local attached = Utils.wait_until(function()
-            return lsp_instance.started and
-                   lsp_instance.client ~= nil and
-                   vim.lsp.buf_is_attached(test_bufnr, lsp_instance.client.id)
+            return msp.started and
+                   msp.client ~= nil and
+                   vim.lsp.buf_is_attached(test_bufnr, msp.client.id)
         end)
 
         eq(attached, true, "LSP failed to attach")
-        eq(lsp_instance:validate(test_bufnr, { started = true }), true)
+        eq(msp:validate(test_bufnr, { started = true }), true)
 
         -- Stop LSP
-        local stopped = lsp_instance:stop_lsp(test_bufnr)
+        local stopped = msp:stop_lsp(test_bufnr)
         eq(stopped, true)
-        eq(lsp_instance.started, false)
+        eq(msp.started, false)
 
         -- Wait for complete cleanup
         local cleaned_up = Utils.wait_until(function()
@@ -97,25 +90,23 @@ describe("Mark-scratch LSP", function()
         end)
 
         eq(cleaned_up, true, "LSP cleanup failed")
-        eq(lsp_instance:validate(test_bufnr, { stopped = true }), true)
+        eq(msp:validate(test_bufnr, { stopped = true }), true)
     end)
 
     it("handles invalid buffer", function()
-        lsp_instance = msp.new()
         local invalid_bufnr = 99999
 
         -- Should not crash when trying to start with invalid buffer
         local ok = pcall(function()
-            lsp_instance:start_lsp(invalid_bufnr)
+            msp:start_lsp(invalid_bufnr)
         end)
         eq(ok, false) -- Should error
     end)
 
     it("get_client returns client when started", function()
-        lsp_instance = msp.new()
 
         -- Before starting, should return nil
-        eq(lsp_instance:get_client(), nil)
+        eq(msp.client, nil)
 
         local has_marksman = vim.fn.executable('marksman') == 1
         if not has_marksman then
@@ -124,25 +115,24 @@ describe("Mark-scratch LSP", function()
         end
 
         -- Start LSP
-        lsp_instance:start_lsp(test_bufnr)
+        msp:start_lsp(test_bufnr)
 
         -- Wait for client to be ready
         local ready = Utils.wait_until(function()
-            local client = lsp_instance:get_client()
+            local client = msp.client or error("nil client")
             return client ~= nil and not client._is_stopping
         end)
 
         eq(ready, true, "Client never became ready")
 
         -- Should return valid client
-        local client = lsp_instance:get_client()
+        local client = msp.client or error("nil client")
         eq(client ~= nil, true)
         eq(type(client), "table")
         eq(client.name, "scratch-marksman")
     end)
 
     it("doesn't start multiple times", function()
-        lsp_instance = msp.new()
 
         local has_marksman = vim.fn.executable('marksman') == 1
         if not has_marksman then
@@ -151,24 +141,24 @@ describe("Mark-scratch LSP", function()
         end
 
         -- Start LSP
-        lsp_instance:start_lsp(test_bufnr)
+        msp:start_lsp(test_bufnr)
 
         -- Wait for first start
         Utils.wait_until(function()
-            return lsp_instance.started and lsp_instance.client ~= nil
+            return msp.started and msp.client ~= nil
         end)
 
-        local first_client = lsp_instance:get_client()
+        local first_client = msp.client or error("nil client")
         local first_client_id = first_client.id
 
         -- Clear logs before second attempt
         logger.logg:clear()
 
         -- Try to start again
-        lsp_instance:start_lsp(test_bufnr)
+        msp:start_lsp(test_bufnr)
 
         -- Should still be the same client
-        eq(lsp_instance:get_client().id, first_client_id)
+        eq(msp.client.id, first_client_id)
 
         -- Logger should not have "Lsp started" message for second call
         local log_lines = logger.logg:get_lines()
@@ -182,7 +172,6 @@ describe("Mark-scratch LSP", function()
     end)
 
     it("stops all attached clients", function()
-        lsp_instance = msp.new()
 
         local has_marksman = vim.fn.executable('marksman') == 1
         if not has_marksman then
@@ -191,7 +180,7 @@ describe("Mark-scratch LSP", function()
         end
 
         -- Start LSP
-        lsp_instance:start_lsp(test_bufnr)
+        msp:start_lsp(test_bufnr)
 
         -- Wait for attachment
         Utils.wait_until(function()
@@ -203,7 +192,7 @@ describe("Mark-scratch LSP", function()
         eq(#attached_before > 0, true)
 
         -- Stop LSP
-        local stop_result = lsp_instance:stop_lsp(test_bufnr)
+        local stop_result = msp:stop_lsp(test_bufnr)
         eq(stop_result, true, "stop_lsp returned false")
 
         -- Wait for all clients to stop
@@ -223,8 +212,6 @@ describe("Mark-scratch LSP", function()
     end)
 
     it("uses custom config when provided", function()
-        lsp_instance = msp.new()
-
         local has_marksman = vim.fn.executable('marksman') == 1
         if not has_marksman then
             pending("marksman not available")
@@ -238,16 +225,16 @@ describe("Mark-scratch LSP", function()
             }
         }
 
-        lsp_instance:start_lsp(test_bufnr, custom_config)
+        msp:start_lsp(test_bufnr, custom_config)
 
         -- Wait for client
         local started = Utils.wait_until(function()
-            return lsp_instance.client ~= nil
+            return msp.client ~= nil
         end)
 
         eq(started, true, "Client never started with custom config")
 
-        local client = lsp_instance:get_client()
+        local client = msp.client or error("nil client")
         eq(client.name, "test-marksman")
 
         -- Check that default config was merged

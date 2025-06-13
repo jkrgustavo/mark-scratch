@@ -1,21 +1,18 @@
 require "plenary.busted"
-local ui_module = require "mark-scratch.ui"
+local ui = require "mark-scratch.ui"
 local config = require "mark-scratch.config"
 
 local eq = assert.are.same
 
 describe("Mark-scratch ui", function()
-    ---@type Ui
-    local ui  -- This will be our ui instance
 
     before_each(function()
         require('plenary.reload').reload_module('mark-scratch.ui')
         require('plenary.reload').reload_module('mark-scratch.config')
-        ui_module = require("mark-scratch.ui")
+        ui = require("mark-scratch.ui")
         config = require("mark-scratch.config")
 
         -- Create a new ui instance with the default config
-        ui = ui_module.new(config.default_config)
         ui:setup({})
     end)
 

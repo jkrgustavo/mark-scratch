@@ -1,10 +1,14 @@
-# TODO
+# Things to do
 
-- [ ] Convert modules to singletons
-- [ ] Refactor ui so it doesn't use `ui.new()` and `ui:setup()`
+## Goals
+
+- [ ] Top-level split or relative to current window
 - [ ] Flesh out winstate more
 - [ ] save to a file
-- [ ] move lsp to be part of ui
-- [ ] Top-level split or relative to current window
+- [ ] dynamic settings ui
 
+## Finished
 
+- [x] Convert modules to singletons
+- [x] Refactor ui so it doesn't use `ui.new()` and `ui:setup()`
+- [x] move lsp to be part of ui

@@ -1,6 +1,6 @@
 local Utils = require("mark-scratch.utils")
 local MSGroup = require("mark-scratch.augroup")
-local Msp = require('mark-scratch.lsp')
+-- local Msp = require('mark-scratch.lsp')
 local Logg = require('mark-scratch.logger').logg
 local Config = require('mark-scratch.config')
 local Ui = require('mark-scratch.ui')
@@ -8,22 +8,21 @@ local Ui = require('mark-scratch.ui')
 ---@class Scratch
 ---@field initialized boolean
 ---@field config ms.config
----@field lsp msp
 ---@field ui Ui
 local Scratch = {}
-
 Scratch.__index = Scratch
 
-function Scratch.new()
+local function new()
     local config = Config.default_config
 
     return setmetatable({
         initialized = false,
         config = config,
-        lsp = Msp.new(config),
-        ui = Ui.new(config)
+        ui = Ui
     }, Scratch)
 end
+
+local instance = new()
 
 ---@return boolean
 ---@param silent? boolean
@@ -43,11 +42,6 @@ function Scratch:validate(silent)
 
     if not self.ui:validate() then
         if not silent then error("Invalid ui") end
-        return false
-    end
-
-    if not self.lsp:validate(self.ui.bufnr, { started = true }) then
-        if not silent then error("Lsp isn't attached to buffer", 2) end
         return false
     end
 
@@ -74,30 +68,20 @@ function Scratch:destroy()
 
     vim.treesitter.stop(bufnr)
 
-    self.lsp:stop_lsp(bufnr)
     self.ui:shutdown()
 
-    local clean = Utils.wait_until(function()
-        local no_open_portals = #vim.fn.win_findbuf(bufnr) == 0
-        local lsp_not_attached = self.lsp:validate(bufnr, { stopped = true })
-        local aug_is_ok = pcall(vim.api.nvim_get_autocmds, { group = MSGroup })
-
-        if not no_open_portals and not lsp_not_attached and aug_is_ok then
-            Logg:log("while waiting" .. ("windows: %s | lsp: %s | aug: %s")
-                 :format(Utils.tostrings(no_open_portals, lsp_not_attached, not aug_is_ok)))
-        end
-
-        return no_open_portals and lsp_not_attached and not aug_is_ok
+    local augroup_clean = Utils.wait_until(function()
+        return not pcall(vim.api.nvim_get_autocmds, { group = MSGroup })
     end)
 
-    if not clean then
-        Logg:log("'clean' was false", self)
+    if not augroup_clean then
+        Logg:log("Augroup wasnt cleaned", self)
         error("unable cleanup resources")
     end
 
     assert(Utils.wait_until(function()
         return not vim.api.nvim_buf_is_valid(bufnr)
-    end))
+    end), "Buffer wasn't destroyed")
 
     Logg:log("Destroyed")
     self.initialized = false
@@ -106,6 +90,10 @@ end
 ---@param config? ms.config.partial
 function Scratch:setup(config)
     config = config or {}
+
+    if self ~= instance then
+        self = instance
+    end
 
     if self.initialized then
         Logg:log("attempt to re-initialize", self)
@@ -116,12 +104,11 @@ function Scratch:setup(config)
     self.config = vim.tbl_deep_extend('force', self.config, config)
 
     self.ui:setup(config)
-    self.lsp:start_lsp(self.ui.bufnr)
     self.initialized = true
 
     vim.api.nvim_create_user_command("MSDest", function()
         self:destroy()
-    end, { desc = "Destroy a buffer" })
+    end, { desc = "Clean resources and un-initialize everything" })
 
     vim.api.nvim_create_autocmd({ "VimLeavePre"}, {
         buffer = self.ui.bufnr,
@@ -130,8 +117,7 @@ function Scratch:setup(config)
         callback = function() self:destroy() end,
     })
 
-
     assert(self:validate(), "End of setup")
 end
 
-return Scratch.new()
+return instance

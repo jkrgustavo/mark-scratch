@@ -29,11 +29,6 @@ msp.__index = msp
 ---@field started? boolean
 ---@field stopped? boolean
 
----@return vim.lsp.Client
-function msp:get_client()
-    return self.client
-end
-
 ---@param opt msp.validate
 ---@return boolean
 function msp:validate(bufnr, opt)
@@ -148,7 +143,7 @@ function msp:start_lsp(bufnr, config)
     self.client = vim.lsp.get_client_by_id(lspnr)
 
     ---@diagnostic disable-next-line: param-type-mismatch
-    vim.treesitter.query.set('markdown', 'highlights', nil) -- nil resets the explicit query from lspsaga
+    vim.treesitter.query.set('markdown', 'highlights', nil) -- nil resets the explicit query set by lspsaga
     vim.treesitter.language.register('markdown', 'scratchmarkdown')
     vim.treesitter.language.add('markdown')
     vim.treesitter.start(bufnr, 'markdown')
@@ -158,14 +153,16 @@ function msp:start_lsp(bufnr, config)
     Logg:log("Lsp started", config)
 end
 
----@param config table | nil
 ---@return msp
-function msp.new(config)
-    Logg:log("Creating new msp", config)
+local function new()
+    Logg:log("Creating new msp")
+
     return setmetatable({
         client = nil,
         started = false,
     }, msp)
 end
 
-return msp
+local instance = new()
+
+return instance
