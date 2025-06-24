@@ -233,12 +233,11 @@ function ui:open_window()
         return
     end
 
-    local cfg = Winstate.winstate_to_winconfig()
-
+    local wintype = self.state.wintype == 'float' and 'float' or 'split'
     self.windnr = Winbuf
         :new({ bufnr = self.bufnr })
-        :win(self.state.wintype == 'float' and 'float' or 'split')
-        :winsetconf(cfg)
+        :win(wintype)
+        :winsetconf(Winstate.winstate_to_winconfig())
         :winopt({
             ['wrap'] = true,
             ['conceallevel'] = 2
@@ -258,9 +257,9 @@ function ui:close_window()
     local winid = self.windnr or -1 -- to make lua_ls relax
 
     -- Save current window state in case the user resized/moved it themselves
-    local wstate = Winstate.winconfig_to_winstate(vim.api.nvim_win_get_config(winid))
-    for k, _ in pairs(wstate) do
-        self.state[k] = wstate[k]
+    local state = Winstate.winconfig_to_winstate(vim.api.nvim_win_get_config(winid))
+    for k, v in pairs(state) do
+        self.state[k] = v
     end
 
     local ok, err = pcall(vim.api.nvim_win_close, winid, false)

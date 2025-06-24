@@ -86,6 +86,9 @@ local data = M.msconfig_to_winstate(Config.default_config.window)
 
 ---@param state? ms.winstate
 ---@return vim.api.keyset.win_config
+--- When state is not provided this function uses the private
+--- state within the winstate module. Otherwise performs the
+--- conversion on the provided state
 function M.winstate_to_winconfig(state)
     ---@type vim.api.keyset.win_config
     local ret
@@ -146,11 +149,9 @@ end
 ---@param cfg ms.config.window
 function M.update_config(cfg)
     local ws = M.msconfig_to_winstate(cfg)
-    Logg:log("Updating config from: ", data, "to: ", ws)
     for k, v in pairs(ws) do
         data[k] = v
     end
-    Logg:log("After data change: ", data)
 end
 
 ---@param dt ms.winstate
@@ -175,6 +176,18 @@ M.mt = {
             Logg:log("Tried to set invalid ui state", k, v)
             error(("invalid entry '%s'"):format(k))
         else
+            if k == 'wintype' and data[k] ~= v then
+                Logg:log("Switching wintypes")
+
+                if v == 'float' then
+                    M.prev_split = vim.fn.deepcopy(data)
+                    data = vim.fn.deepcopy(M.prev_float)
+                else
+                    M.prev_float = vim.fn.deepcopy(data)
+                    data = vim.fn.deepcopy(M.prev_split)
+                end
+            end
+
             data[k] = v
 
             on_change(data)
@@ -182,6 +195,11 @@ M.mt = {
 
     end
 }
+
+M.prev_float = M.msconfig_to_winstate(
+    vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'float' }))
+M.prev_split = M.msconfig_to_winstate(
+    vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'split' }))
 
 M.is_float = is_float
 M.is_horizontal = is_horizontal

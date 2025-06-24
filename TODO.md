@@ -2,14 +2,15 @@
 
 ## Goals
 
-- [ ] represent splits and floats better
-    - [ ] save split and float states separately (better experience switching between)
-- [ ] save to a file
-- [ ] move winstate to its own module
 - [ ] dynamic settings ui
+- [ ] save to a file
+- [ ] save horizontal and vertical splits seperately
 
 ## Finished
 
+- [x] represent splits and floats better
+- [x] save split and float states seperately (better experience switching between)
+- [x] move winstate to its own module
 - [x] Flesh out winstate more
 - [x] Convert modules to singletons
 - [x] Refactor ui so it doesn't use `ui.new()` and `ui:setup()`
