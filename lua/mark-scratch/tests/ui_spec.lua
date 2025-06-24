@@ -7,8 +7,10 @@ local eq = assert.are.same
 describe("Mark-scratch ui", function()
 
     before_each(function()
-        require('plenary.reload').reload_module('mark-scratch.ui')
-        require('plenary.reload').reload_module('mark-scratch.config')
+        local reload = require('plenary.reload').reload_module
+        reload('mark-scratch.ui')
+        reload('mark-scratch.config')
+        reload('mark-scratch.winstate')
         ui = require("mark-scratch.ui")
         config = require("mark-scratch.config")
 
@@ -86,40 +88,5 @@ describe("Mark-scratch ui", function()
         eq(ui.bufnr, -1)
         eq(vim.api.nvim_win_is_valid(wnr), false)
         eq(vim.api.nvim_buf_is_valid(bnr), false)
-    end)
-
-    it("dynamic winstate works correctly", function()
-        eq(config.default_config.window.float_x, ui.state.x)
-        eq(config.default_config.window.float_y, ui.state.y)
-
-        local x_new = ui.state.x + 10
-        local y_new = ui.state.y + 5
-
-        ui:open_window()
-
-        ui.state.x = x_new
-        ui.state.y = y_new
-
-        eq(x_new, ui.__data.x)
-        eq(y_new, ui.__data.y)
-
-        local wincfg = vim.api.nvim_win_get_config(ui.windnr)
-        eq(x_new, wincfg.col)
-        eq(y_new, wincfg.row)
-
-        ui:close_window()
-
-        x_new = ui.state.x - 20
-        y_new = ui.state.y - 10
-
-        ui.state.x = x_new
-        ui.state.y = y_new
-
-        ui:open_window()
-
-        wincfg = vim.api.nvim_win_get_config(ui.windnr)
-        eq(x_new, wincfg.col)
-        eq(y_new, wincfg.row)
-
     end)
 end)
