@@ -4,56 +4,53 @@ local MSGroup = require('mark-scratch.augroup')
 local Utils = require('mark-scratch.utils')
 local Config = require('mark-scratch.config')
 local Msp = require('mark-scratch.lsp')
-
-local FTYPE = "scratchmarkdown"
-
----@class winstate
----@field x integer
----@field y integer
-
----@param cfg ms.config
----@return Ui
-local function data_setup(cfg)
-    local instance = {
-        bufnr = -1,
-        windnr = nil,
-        config = cfg,
-        initialized = false,
-        lsp = Msp
-    }
-    instance.__data = {
-        x = cfg.window.float_x,
-        y = cfg.window.float_y
-    }
-    instance.state = setmetatable({}, {
-        __index = function(_, k)
-            local ret = instance.__data[k]
-            Logg:log("index called", k, ret)
-            return ret
-        end,
-        __newindex = function(_, k, v)
-            Logg:log("newindex called: " .. k .. ' ' .. tostring(v))
-            if not instance.__data[k] then
-                Logg:log("Tried to set invalid ui state", k, v)
-                error(("invalid entry '%s'"):format(k))
-            else
-                instance.__data[k] = v
-                if instance.windnr then
-                    Logg:log("updating winconfig too")
-                    vim.api.nvim_win_set_config(instance.windnr, {
-                        relative = 'editor',
-                        row = instance.__data.y,
-                        col = instance.__data.x
-                    })
-                end
-            end
-
-        end
-    })
-
-    return instance
-end
-
+local Winstate = require('mark-scratch.winstate')
+--
+-- ---@param cfg ms.config
+-- ---@return Ui
+-- local function data_setup(cfg)
+--     local config = instance.config
+--     instance.__data = {
+--         col = config.window.float_x,
+--         row = config.window.float_y,
+--         width = config.window.width,
+--         height = config.window.height,
+--         split = config.window.wintype == 'split'
+--     }
+--     instance.state = setmetatable({}, {
+--         __index = function(_, k)
+--             local ret = instance.__data[k]
+--             Logg:log("index called", k, ret)
+--             return ret
+--         end,
+--         __newindex = function(_, k, v)
+--             Logg:log("newindex called: " .. k .. ' ' .. tostring(v))
+--             if not instance.__data[k] then
+--                 Logg:log("Tried to set invalid ui state", k, v)
+--                 error(("invalid entry '%s'"):format(k))
+--             else
+--                 instance.__data[k] = v
+--                 if instance.windnr then
+--                     Logg:log("updating winconfig too")
+--
+--                     local relative = not instance.__data.split and 'editor' or nil
+--
+--                     vim.api.nvim_win_set_config(instance.windnr, {
+--                         relative = relative,
+--                         row = instance.__data.row,
+--                         col = instance.__data.col,
+--                         width = instance.__data.width,
+--                         height = instance.__data.height
+--                     })
+--                 end
+--             end
+--
+--         end
+--     })
+--
+--     return instance
+-- end
+--
 
 ---@param mui Ui
 local function make_commands(mui)
@@ -106,16 +103,16 @@ end
 ---@param u Ui
 local function make_keybinds(u)
     vim.keymap.set('n', u.config.keybinds.float_up, function()
-        u.state.y = u.state.y - 5
+        u.state.row = u.state.row - 5
     end)
     vim.keymap.set('n', u.config.keybinds.float_down, function()
-        u.state.y = u.state.y + 5
+        u.state.row = u.state.row + 5
     end)
     vim.keymap.set('n', u.config.keybinds.float_left, function()
-        u.state.x = u.state.x - 5
+        u.state.col = u.state.col - 5
     end)
     vim.keymap.set('n', u.config.keybinds.float_right, function()
-        u.state.x = u.state.x + 5
+        u.state.col = u.state.col + 5
     end)
 
     vim.keymap.set('n', u.config.keybinds.open_scratch, function()
@@ -134,7 +131,7 @@ local function init(u)
     u.bufnr = Winbuf
         :new({ name = buf_name, scratch = true })
         :bufopt({
-            ['filetype'] = FTYPE,
+            ['filetype'] = 'scratchmarkdown',
             ['tabstop'] = 2,
             ['shiftwidth'] = 2
         })
@@ -147,11 +144,13 @@ local function init(u)
 
     make_commands(u)
     make_keybinds(u)
+    Winstate.update_config(u.config.window)
     u.lsp:start_lsp(u.bufnr)
 
     u.initialized = true
     Logg:log("Initialied ui")
 end
+
 
 ---@class Ui
 ---@field lsp msp
@@ -159,16 +158,29 @@ end
 ---@field windnr integer | nil
 ---@field config ms.config
 ---@field initialized boolean
----@field state winstate
----@field private __data winstate
+---@field state ms.winstate
 local ui = {}
 ui.__index = ui
 
 ---@return Ui
 local function new()
-    local data = data_setup(Config.default_config)
 
-    return setmetatable(data, ui)
+    local instance = {
+        bufnr = -1,
+        windnr = nil,
+        config = Config.default_config,
+        initialized = false,
+        lsp = Msp,
+        state = setmetatable({}, Winstate.mt)
+    }
+
+    Winstate.set_callback(function(d)
+        if instance.windnr and vim.api.nvim_win_is_valid(instance.windnr) then
+            vim.api.nvim_win_set_config(instance.windnr, Winstate.winstate_to_winconfig(d))
+        end
+    end)
+
+    return setmetatable(instance, ui)
 end
 
 local instance = new()
@@ -201,11 +213,13 @@ function ui:setup(config)
     end
 
     config = config or {}
+
     self.config = vim.tbl_deep_extend('force', self.config, config)
 
     if not self.initialized then
         init(self)
     end
+
 end
 
 function ui:open_window()
@@ -219,39 +233,20 @@ function ui:open_window()
         return
     end
 
-    local cfg = self.config.window
-    if cfg.wintype == 'float' then
-        self.windnr = Winbuf
-            :new({ bufnr = self.bufnr })
-            :win('float')
-            :winsetconf({
-                width = cfg.width,
-                height = cfg.height,
-                row = self.state.y,
-                col = self.state.x,
-            })
-            :winopt({
-                ['wrap'] = true,
-                ['conceallevel'] = 2
-            })
-            :wininfo()
-    elseif cfg.wintype == 'split' then
-        self.windnr = Winbuf
-            :new({ bufnr = self.bufnr })
-            :win('split')
-            :winsetconf({
-                split = cfg.split_direction,
-                vertical = cfg.vertical
-            })
-            :winopt({
-                ['wrap'] = true,
-                ['conceallevel'] = 2
-            })
-            :wininfo()
-    end
+    local cfg = Winstate.winstate_to_winconfig()
 
-    Logg:log("opened new " .. cfg.wintype)
+    self.windnr = Winbuf
+        :new({ bufnr = self.bufnr })
+        :win(self.state.wintype == 'float' and 'float' or 'split')
+        :winsetconf(cfg)
+        :winopt({
+            ['wrap'] = true,
+            ['conceallevel'] = 2
+        })
+        :wininfo()
+
 end
+
 
 function ui:close_window()
     if not self.windnr or not vim.api.nvim_win_is_valid(self.windnr) then
@@ -261,6 +256,13 @@ function ui:close_window()
     end
 
     local winid = self.windnr or -1 -- to make lua_ls relax
+
+    -- Save current window state in case the user resized/moved it themselves
+    local wstate = Winstate.winconfig_to_winstate(vim.api.nvim_win_get_config(winid))
+    for k, _ in pairs(wstate) do
+        self.state[k] = wstate[k]
+    end
+
     local ok, err = pcall(vim.api.nvim_win_close, winid, false)
     if not ok then
         Logg:log("Errror while closing window: ", err)

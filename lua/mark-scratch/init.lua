@@ -92,6 +92,7 @@ function Scratch:setup(config)
     config = config or {}
 
     if self ~= instance then
+        Logg:log("Swapping instances")
         self = instance
     end
 
@@ -99,7 +100,6 @@ function Scratch:setup(config)
         Logg:log("attempt to re-initialize", self)
         return
     end
-
 
     self.config = vim.tbl_deep_extend('force', self.config, config)
 
