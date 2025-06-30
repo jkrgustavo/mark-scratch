@@ -2,12 +2,20 @@
 
 ## Goals
 
-- [ ] dynamic settings ui
+- [ ] update prompt text with current wintype settings dynamically
+- [ ] when user changes config in `ms:setup()` only update relavent winstate
 - [ ] save to a file
-- [ ] save horizontal and vertical splits seperately
+- [ ] *save horizontal and vertical splits seperately*
+- [ ] better keybinds
+- [ ] refactor window representation
+    - bundle buffer/window info into a single object
+    - store in lists
+    - winbuf is useful here
+- [ ] move winstate settings to ui.lua
 
 ## Finished
 
+- [x] *dynamic settings ui*
 - [x] represent splits and floats better
 - [x] save split and float states seperately (better experience switching between)
 - [x] move winstate to its own module
@@ -76,3 +84,4 @@ end
 
 
 ```
+

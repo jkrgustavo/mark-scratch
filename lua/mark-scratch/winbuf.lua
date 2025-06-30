@@ -74,6 +74,7 @@ function obj:winopt(name, val)
             vim.api.nvim_set_option_value(k, v, { scope = 'local', win = self.winid })
         end
     else
+
         vim.api.nvim_set_option_value(name, val, { scope = 'local', win = self.winid })
     end
 
@@ -143,6 +144,17 @@ winbuf.__index = winbuf
 
 local count = 0
 ---@param opts winbufOpts
+--- The options with their defaults are:
+--- scratch? : false
+--- bufnr? : nil
+--- name? : "[[winbuf | count | time]]"
+---
+--- The buffer option allows existing buffers to be modified, and the
+--- scratch option just sets the corresponding field in 
+--- 'nvim_create_buf'.
+---
+--- Returns an object that's used to configure the buffer or 
+--- create/configure a window.
 function winbuf:new(opts)
     count = count + 1
 

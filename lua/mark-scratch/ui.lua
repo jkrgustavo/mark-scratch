@@ -5,52 +5,6 @@ local Utils = require('mark-scratch.utils')
 local Config = require('mark-scratch.config')
 local Msp = require('mark-scratch.lsp')
 local Winstate = require('mark-scratch.winstate')
---
--- ---@param cfg ms.config
--- ---@return Ui
--- local function data_setup(cfg)
---     local config = instance.config
---     instance.__data = {
---         col = config.window.float_x,
---         row = config.window.float_y,
---         width = config.window.width,
---         height = config.window.height,
---         split = config.window.wintype == 'split'
---     }
---     instance.state = setmetatable({}, {
---         __index = function(_, k)
---             local ret = instance.__data[k]
---             Logg:log("index called", k, ret)
---             return ret
---         end,
---         __newindex = function(_, k, v)
---             Logg:log("newindex called: " .. k .. ' ' .. tostring(v))
---             if not instance.__data[k] then
---                 Logg:log("Tried to set invalid ui state", k, v)
---                 error(("invalid entry '%s'"):format(k))
---             else
---                 instance.__data[k] = v
---                 if instance.windnr then
---                     Logg:log("updating winconfig too")
---
---                     local relative = not instance.__data.split and 'editor' or nil
---
---                     vim.api.nvim_win_set_config(instance.windnr, {
---                         relative = relative,
---                         row = instance.__data.row,
---                         col = instance.__data.col,
---                         width = instance.__data.width,
---                         height = instance.__data.height
---                     })
---                 end
---             end
---
---         end
---     })
---
---     return instance
--- end
---
 
 ---@param mui Ui
 local function make_commands(mui)
@@ -67,21 +21,21 @@ local function make_commands(mui)
         end
     })
 
-    vim.api.nvim_create_autocmd({ "WinClosed" }, {
-        buffer = mui.bufnr,
-        once = false,
-        group = MSGroup,
-        callback = function(e)
-            if mui.windnr then
-                if vim.api.nvim_win_is_valid(mui.windnr) then
-                    mui:close_window()
-                else
-                    mui.windnr = nil
-                end
-            end
-            Logg:log("Callback triggered: ", e)
-        end
-    })
+    -- vim.api.nvim_create_autocmd({ "WinClosed" }, {
+    --     buffer = mui.bufnr,
+    --     once = false,
+    --     group = MSGroup,
+    --     callback = function(e)
+    --         if mui.windnr then
+    --             if vim.api.nvim_win_is_valid(mui.windnr) then
+    --                 mui:close_window()
+    --             else
+    --                 mui.windnr = nil
+    --             end
+    --         end
+    --         Logg:log("Callback triggered: ", e)
+    --     end
+    -- })
 
     vim.api.nvim_create_user_command("MSOpen", function()
         mui:open_window()
@@ -118,6 +72,8 @@ local function make_keybinds(u)
     vim.keymap.set('n', u.config.keybinds.open_scratch, function()
         u:open_window()
     end)
+
+    vim.keymap.set('n', '<leader>mo', Winstate.open_settings_window)
 
 end
 
@@ -244,23 +200,34 @@ function ui:open_window()
         })
         :wininfo()
 
+    Logg:log(
+        ("Opened new '%s', winconfig: "):format(wintype),
+        Winstate.winstate_to_winconfig())
 end
 
 
 function ui:close_window()
-    if not self.windnr or not vim.api.nvim_win_is_valid(self.windnr) then
+    local winid = self.windnr or -1 -- to make lua_ls relax
+
+    if not winid or not vim.api.nvim_win_is_valid(winid) then
         Logg:log("double close")
         self.windnr = nil
         return
     end
 
-    local winid = self.windnr or -1 -- to make lua_ls relax
 
     -- Save current window state in case the user resized/moved it themselves
-    local state = Winstate.winconfig_to_winstate(vim.api.nvim_win_get_config(winid))
-    for k, v in pairs(state) do
-        self.state[k] = v
-    end
+    local nvwincfg = vim.api.nvim_win_get_config(winid)
+    -- local state = Winstate.winconfig_to_winstate(nvwincfg)
+    -- Logg:log(("Closing window. self.windnr: %s, winid: %s. State: ")
+    --     :format(Utils.tostrings(self.windnr, winid)),
+    --     state,
+    --     "nvwincfg: ",
+    --     nvwincfg)
+    Winstate.save_winconfig(nvwincfg)
+    -- for k, v in pairs(state) do
+    --     self.state[k] = v
+    -- end
 
     local ok, err = pcall(vim.api.nvim_win_close, winid, false)
     if not ok then
@@ -268,7 +235,7 @@ function ui:close_window()
         return
     end
 
-    Logg:log("closing the window")
+    -- Logg:log("closing the window")
     self.windnr = nil
 
 end

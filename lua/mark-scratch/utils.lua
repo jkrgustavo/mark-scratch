@@ -38,4 +38,18 @@ function M.tostrings(...)
     return table.unpack(strings)
 end
 
+---@param str string
+---@param char string
+---@return string[]
+function M.str_split(str, char)
+
+    local res = {}
+
+    for l in str:gmatch("([^" .. char .. "]+)") do
+        table.insert(res, l)
+    end
+
+    return res
+end
+
 return M
