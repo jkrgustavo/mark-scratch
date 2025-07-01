@@ -2,6 +2,7 @@
 
 ## Goals
 
+- [ ] lazy initialize
 - [ ] update prompt text with current wintype settings dynamically
 - [ ] when user changes config in `ms:setup()` only update relavent winstate
 - [ ] save to a file

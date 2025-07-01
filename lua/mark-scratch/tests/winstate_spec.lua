@@ -1,7 +1,7 @@
 ---@diagnostic disable: missing-fields
 require "plenary.busted"
 local Winstate = require "mark-scratch.winstate"
-local Config = require "mark-scratch.config"
+-- local Config = require "mark-scratch.config"
 
 local eq = assert.are.same
 
@@ -12,7 +12,7 @@ describe("Mark-scratch winstate", function()
         reload('mark-scratch.winstate')
         reload('mark-scratch.config')
         Winstate = require("mark-scratch.winstate")
-        Config = require("mark-scratch.config")
+        -- Config = require("mark-scratch.config")
     end)
 
     describe("msconfig_to_winstate conversions", function()
@@ -54,14 +54,14 @@ describe("Mark-scratch winstate", function()
             local config = {
                 wintype = 'split',
                 vertical = false,
-                width = 80, -- actually height for horizontal split based on code
+                width = 80,
                 height = 20,
             }
 
             local state = Winstate.msconfig_to_winstate(config)
 
             eq(state.wintype, 'horizontal')
-            eq(state.height, 80) -- width is used as height for horizontal
+            eq(state.height, 20)
             eq(state.width, nil)
         end)
 
@@ -157,6 +157,7 @@ describe("Mark-scratch winstate", function()
         it("converts vertical split vim config to state", function()
             local config = {
                 vertical = true,
+                split = 'right',
                 width = 45,
                 height = nil,
                 relative = "",
@@ -164,8 +165,8 @@ describe("Mark-scratch winstate", function()
 
             local state = Winstate.winconfig_to_winstate(config)
 
-            eq(state.wintype, 'vertical')
-            eq(state.width, 45)
+            eq('vertical', state.wintype)
+            eq(45, state.width)
         end)
 
         it("converts horizontal split vim config to state", function()

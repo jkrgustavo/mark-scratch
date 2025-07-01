@@ -117,7 +117,7 @@ function Scratch:setup(config)
         callback = function() self:destroy() end,
     })
 
-    assert(self:validate(), "End of setup")
+    -- assert(self:validate(), "End of setup")
 end
 
 return instance

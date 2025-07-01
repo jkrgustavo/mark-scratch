@@ -25,8 +25,8 @@ describe("Mark-scratch ui", function()
     end)
 
     it("Setup correctly initializes ui", function()
-        eq(ui:validate(), true, "validate failed")
-        eq(ui.initialized, true)
+        eq(true, ui:validate())
+        eq(true, ui.initialized)
         eq(
             config.default_config,
             ui.config,
@@ -77,7 +77,7 @@ describe("Mark-scratch ui", function()
     end)
 
     it("Shutdown deinitializes everyting", function()
-        eq(ui:validate(), true)
+        eq(true, ui:validate())
 
         local wnr = ui.windnr or -1
         local bnr = ui.bufnr or -1

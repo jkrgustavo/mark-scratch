@@ -21,21 +21,21 @@ local function make_commands(mui)
         end
     })
 
-    -- vim.api.nvim_create_autocmd({ "WinClosed" }, {
-    --     buffer = mui.bufnr,
-    --     once = false,
-    --     group = MSGroup,
-    --     callback = function(e)
-    --         if mui.windnr then
-    --             if vim.api.nvim_win_is_valid(mui.windnr) then
-    --                 mui:close_window()
-    --             else
-    --                 mui.windnr = nil
-    --             end
-    --         end
-    --         Logg:log("Callback triggered: ", e)
-    --     end
-    -- })
+    vim.api.nvim_create_autocmd({ "WinClosed" }, {
+        buffer = mui.bufnr,
+        once = false,
+        group = MSGroup,
+        callback = function(e)
+            if mui.windnr and not mui.config.window.close_on_leave then
+                if vim.api.nvim_win_is_valid(mui.windnr) then
+                    mui:close_window()
+                else
+                    mui.windnr = nil
+                end
+            end
+            Logg:log("Callback triggered: ", e)
+        end
+    })
 
     vim.api.nvim_create_user_command("MSOpen", function()
         mui:open_window()
@@ -101,7 +101,7 @@ local function init(u)
     make_commands(u)
     make_keybinds(u)
     Winstate.update_config(u.config.window)
-    u.lsp:start_lsp(u.bufnr)
+    -- u.lsp:start_lsp(u.bufnr)
 
     u.initialized = true
     Logg:log("Initialied ui")
@@ -145,7 +145,7 @@ function ui:validate()
     local valid = self.initialized
         and (not self.windnr or vim.api.nvim_win_is_valid(self.windnr))
         and vim.api.nvim_buf_is_valid(self.bufnr)
-        and self.lsp:validate(self.bufnr, { started = true })
+        -- and self.lsp:validate(self.bufnr, { started = true })
 
     if not valid then
         Logg:log(
@@ -179,6 +179,13 @@ function ui:setup(config)
 end
 
 function ui:open_window()
+    -- if not self.initialized then
+    --     init(self)
+    -- end
+    if not self.lsp:validate(self.bufnr, { started = true }) then
+        self.lsp:start_lsp(self.bufnr)
+    end
+
     if not self:validate() then
         Logg:log("Open window called with invalid ui")
         return
