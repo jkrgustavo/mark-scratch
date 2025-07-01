@@ -101,7 +101,6 @@ local function init(u)
     make_commands(u)
     make_keybinds(u)
     Winstate.update_config(u.config.window)
-    -- u.lsp:start_lsp(u.bufnr)
 
     u.initialized = true
     Logg:log("Initialied ui")
@@ -145,7 +144,6 @@ function ui:validate()
     local valid = self.initialized
         and (not self.windnr or vim.api.nvim_win_is_valid(self.windnr))
         and vim.api.nvim_buf_is_valid(self.bufnr)
-        -- and self.lsp:validate(self.bufnr, { started = true })
 
     if not valid then
         Logg:log(
@@ -179,9 +177,6 @@ function ui:setup(config)
 end
 
 function ui:open_window()
-    -- if not self.initialized then
-    --     init(self)
-    -- end
     if not self.lsp:validate(self.bufnr, { started = true }) then
         self.lsp:start_lsp(self.bufnr)
     end

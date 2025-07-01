@@ -58,7 +58,6 @@ M.default_config = {
     window = {
         wintype = 'float',
         split_direction = 'right',
-        vertical = true,
         width = width,
         height = height,
         float_x = math.floor((vim.o.columns - width) / 2),

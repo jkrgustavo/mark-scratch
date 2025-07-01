@@ -172,18 +172,6 @@ M.mt = {
 
                 M.prev[data.wintype] = vim.fn.deepcopy(data)
                 data = vim.tbl_deep_extend('force', data, M.prev[v])
-                -- if v == 'float' then
-                --     if data.wintype == 'vertical' then
-                --         M.prev_vertical = vim.fn.deepcopy(data)
-                --         data = vim.tbl_deep_extend('force', data, M.prev_float)
-                --     else
-                --         M.prev_horizontal = vim.fn.deepcopy(data)
-                --         data = vim.tbl_deep_extend('force', data, M.prev_float)
-                --     end
-                -- elseif v == 'vertical' then
-                --     M.prev_float = vim.fn.deepcopy(data)
-                --     data = vim.tbl_deep_extend('force', data, M.prev_split)
-                -- end
             end
 
             data[k] = v
@@ -194,21 +182,15 @@ M.mt = {
     end
 }
 
-M.prev = {
-    float = M.msconfig_to_winstate(
-        vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'float' })),
-    vertical = M.msconfig_to_winstate(
-        vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'vertical' })),
-    horizontal = M.msconfig_to_winstate(
-        vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'horizontal' }))
-}
+local function create_default(mscfg)
+    return M.msconfig_to_winstate(vim.tbl_deep_extend('force', Config.default_config.window, mscfg))
+end
 
--- M.prev_float = M.msconfig_to_winstate(
---     vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'float' }))
--- M.prev_vertical = M.msconfig_to_winstate(
---     vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'vertical' }))
--- M.prev_horizontal = M.msconfig_to_winstate(
---     vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'horizontal' }))
+M.prev = {
+    float = create_default({ wintype = 'float' }),
+    vertical = create_default({ wintype = 'vertical' }),
+    horizontal =create_default({ wintype = 'horizontal' })
+}
 
 ---@param bufnr integer
 ---@param resp string[]

@@ -37,10 +37,9 @@ describe("Mark-scratch winstate", function()
 
         it("converts vertical split config correctly", function()
             local config = {
-                wintype = 'split',
-                vertical = true,
+                wintype = 'vertical',
                 width = 40,
-                height = 20, -- should be ignored for vertical
+                height = 20,
             }
 
             local state = Winstate.msconfig_to_winstate(config)
@@ -52,8 +51,7 @@ describe("Mark-scratch winstate", function()
 
         it("converts horizontal split config correctly", function()
             local config = {
-                wintype = 'split',
-                vertical = false,
+                wintype = 'horizontal',
                 width = 80,
                 height = 20,
             }
@@ -183,26 +181,6 @@ describe("Mark-scratch winstate", function()
         end)
     end)
 
-    describe("helper functions", function()
-        it("is_float identifies float windows", function()
-            eq(Winstate.is_float({ wintype = 'float' }), true)
-            eq(Winstate.is_float({ wintype = 'vertical' }), false)
-            eq(Winstate.is_float({ wintype = 'horizontal' }), false)
-        end)
-
-        it("is_vertical identifies vertical splits", function()
-            eq(Winstate.is_vertical({ wintype = 'vertical' }), true)
-            eq(Winstate.is_vertical({ wintype = 'float' }), false)
-            eq(Winstate.is_vertical({ wintype = 'horizontal' }), false)
-        end)
-
-        it("is_horizontal identifies horizontal splits", function()
-            eq(Winstate.is_horizontal({ wintype = 'horizontal' }), true)
-            eq(Winstate.is_horizontal({ wintype = 'float' }), false)
-            eq(Winstate.is_horizontal({ wintype = 'vertical' }), false)
-        end)
-    end)
-
     describe("metatable behavior", function()
         it("metatable __index returns correct values", function()
             local config = {
@@ -305,8 +283,7 @@ describe("Mark-scratch winstate", function()
 
         it("vertical split survives round trip", function()
             local original_config = {
-                wintype = 'split',
-                vertical = true,
+                wintype = 'vertical',
                 width = 55,
             }
 

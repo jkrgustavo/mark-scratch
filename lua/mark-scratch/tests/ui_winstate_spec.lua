@@ -93,8 +93,7 @@ describe("Mark-scratch UI window state integration", function()
 
             local test_config = {
                 window = {
-                    wintype = 'split',
-                    vertical = true,
+                    wintype = 'vertical',
                     width = 50,
                 }
             }
