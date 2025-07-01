@@ -69,11 +69,11 @@ local function make_keybinds(u)
         u.state.col = u.state.col + 5
     end)
 
-    vim.keymap.set('n', u.config.keybinds.open_scratch, function()
-        u:open_window()
+    vim.keymap.set('n', u.config.keybinds.toggle_scratch, function()
+        u:toggle_window()
     end)
 
-    vim.keymap.set('n', '<leader>mo', Winstate.open_settings_window)
+    vim.keymap.set('n', u.config.keybinds.toggle_menu, Winstate.open_settings_window)
 
 end
 
@@ -212,9 +212,8 @@ function ui:open_window()
         Winstate.winstate_to_winconfig())
 end
 
-
 function ui:close_window()
-    local winid = self.windnr or -1 -- to make lua_ls relax
+    local winid = self.windnr
 
     if not winid or not vim.api.nvim_win_is_valid(winid) then
         Logg:log("double close")
@@ -225,26 +224,24 @@ function ui:close_window()
 
     -- Save current window state in case the user resized/moved it themselves
     local nvwincfg = vim.api.nvim_win_get_config(winid)
-    -- local state = Winstate.winconfig_to_winstate(nvwincfg)
-    -- Logg:log(("Closing window. self.windnr: %s, winid: %s. State: ")
-    --     :format(Utils.tostrings(self.windnr, winid)),
-    --     state,
-    --     "nvwincfg: ",
-    --     nvwincfg)
     Winstate.save_winconfig(nvwincfg)
-    -- for k, v in pairs(state) do
-    --     self.state[k] = v
-    -- end
 
     local ok, err = pcall(vim.api.nvim_win_close, winid, false)
     if not ok then
         Logg:log("Errror while closing window: ", err)
-        return
+        error("Unable to close window")
     end
 
-    -- Logg:log("closing the window")
     self.windnr = nil
 
+end
+
+function ui:toggle_window()
+    if self.windnr and vim.api.nvim_win_is_valid(self.windnr) then
+        self:close_window()
+    else
+        self:open_window()
+    end
 end
 
 function ui:shutdown()

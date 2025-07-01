@@ -114,8 +114,6 @@ function M.winstate_to_winconfig(state)
         error("Invalid wintype")
     end
 
-    Logg:log("Current state: ", state, "After conversion: ", ret)
-
     return ret
 end
 
@@ -226,16 +224,17 @@ local function prompt_set_response(bufnr, resp)
     vim.api.nvim_buf_set_lines(bufnr, insert_line, insert_line, false, resp)
 end
 
-local function prompt_lines()
+local function prelude_lines()
     local lines = {
-        "Enter 'h' for help",
-        "",
         "Provide the name of the setting to change and it's value.",
         "Ex:",
         "   wintype float",
         "   height 50",
         "",
-        "State:",
+        ("Max width: %s"):format(tostring(vim.o.columns)),
+        ("Max height: %s"):format(tostring(vim.o.lines)),
+        "",
+        "Current state:",
         ("| wintype: %s"):format(data.wintype)
     }
 
@@ -268,7 +267,13 @@ end
 
 ---@param bufnr integer
 ---@param text string
-local function apply_user_input(bufnr, text)
+local function apply_user_input(bufnr, winid, text)
+
+    if text == 'q' then
+        vim.api.nvim_win_close(winid, true)
+        Logg:log("'q' recieved, closing window")
+        return
+    end
 
     ---@type ms.winstate
     local st = setmetatable({}, M.mt)
@@ -291,19 +296,22 @@ local function apply_user_input(bufnr, text)
         v = tonumber(v)
     end
 
-    Logg:log(("Setting '%s' to '%s' from promp buffer"):format(k, v))
+    Logg:log(("Setting '%s' to '%s' from prompt buffer"):format(k, v))
 
     st[k] = v
 
-    vim.bo[bufnr].modified = false
+    vim.api.nvim_buf_set_lines(bufnr, 0, -2, false, prelude_lines())
+    prompt_set_response(bufnr, { ("%s %s"):format(Utils.tostrings(k, v)) })
 end
 
 local bufnr = -1
 local winid = nil
 local count = 0
 
+
 function M.open_settings_window()
     if winid and vim.api.nvim_win_is_valid(winid) then
+        vim.api.nvim_win_close(winid, true)
         return
     end
 
@@ -332,12 +340,11 @@ function M.open_settings_window()
         })
         :info()
 
-    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, prompt_lines())
+    vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, prelude_lines())
 
     vim.fn.prompt_setprompt(bufnr, '> ')
     vim.fn.prompt_setcallback(bufnr, function(text)
-        apply_user_input(bufnr, text)
-        vim.bo[bufnr].modified = false
+        apply_user_input(bufnr, winid, text)
     end)
     vim.fn.prompt_setinterrupt(bufnr, function()
         vim.api.nvim_win_close(winid, true)

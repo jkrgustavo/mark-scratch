@@ -1,7 +1,8 @@
 local M = {}
 
 ---@class ms.config.partial.keybinds
----@field open_scratch? string
+---@field toggle_menu? string
+---@field toggle_scratch? string
 ---@field float_up? string
 ---@field float_down? string
 ---@field float_left? string
@@ -22,7 +23,8 @@ local M = {}
 ---@field window? ms.config.partial.window
 
 ---@class ms.config.keybinds
----@field open_scratch string
+---@field toggle_menu string
+---@field toggle_scratch string
 ---@field float_up string
 ---@field float_down string
 ---@field float_left string
@@ -47,11 +49,12 @@ local height = 50
 M.default_config = {
 
     keybinds = {
-        open_scratch = '<leader>ms',
-        float_up    = '<leader><Up>',
-        float_down  = '<leader><Down>',
-        float_left  = '<leader><Left>',
-        float_right = '<leader><Right>',
+        toggle_menu    = '<leader>mo',
+        toggle_scratch = '<leader>ms',
+        float_up       = '<leader><Up>',
+        float_down     = '<leader><Down>',
+        float_left     = '<leader><Left>',
+        float_right    = '<leader><Right>',
     },
 
     window = {

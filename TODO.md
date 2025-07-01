@@ -2,11 +2,9 @@
 
 ## Goals
 
-- [ ] lazy initialize
-- [ ] update prompt text with current wintype settings dynamically
 - [ ] when user changes config in `ms:setup()` only update relavent winstate
-- [ ] save to a file
 - [ ] *save horizontal and vertical splits seperately*
+- [ ] save to a file
 - [ ] better keybinds
 - [ ] refactor window representation
     - bundle buffer/window info into a single object
@@ -16,6 +14,9 @@
 
 ## Finished
 
+- [x] change keybinds to toggle instead of just open
+- [x] update prompt text with current wintype settings dynamically
+- [x] lazy initialize lsp
 - [x] *dynamic settings ui*
 - [x] represent splits and floats better
 - [x] save split and float states seperately (better experience switching between)
