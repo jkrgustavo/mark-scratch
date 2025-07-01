@@ -3,17 +3,15 @@
 ## Goals
 
 - [ ] when user changes config in `ms:setup()` only update relavent winstate
-- [ ] *save horizontal and vertical splits seperately*
-- [ ] save to a file
-- [ ] better keybinds
+- [ ] *save to a file*
 - [ ] refactor window representation
     - bundle buffer/window info into a single object
     - store in lists
     - winbuf is useful here
-- [ ] move winstate settings to ui.lua
 
 ## Finished
 
+- [x] *save horizontal and vertical splits seperately*
 - [x] change keybinds to toggle instead of just open
 - [x] update prompt text with current wintype settings dynamically
 - [x] lazy initialize lsp

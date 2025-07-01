@@ -27,25 +27,6 @@ local M = {}
 
 ---@alias ms.winstate ms.winstate.float | ms.winstate.split.vertical | ms.winstate.split.horizontal
 
----@param settings ms.winstate
----@return boolean
-local function is_float(settings)
-    return settings.wintype == 'float'
-end
-
-
----@param settings ms.winstate
----@return boolean
-local function is_vertical(settings)
-    return settings.wintype == 'vertical'
-end
-
----@param settings ms.winstate
----@return boolean
-local function is_horizontal(settings)
-    return settings.wintype == 'horizontal'
-end
-
 ---@param config ms.config.window
 ---@return ms.winstate
 function M.msconfig_to_winstate(config)
@@ -61,14 +42,14 @@ function M.msconfig_to_winstate(config)
             row = config.float_y,
             col = config.float_x,
         }
-    elseif config.wintype == 'split' and config.vertical then
+    elseif config.wintype == 'vertical' then
         wintype = 'vertical'
         ---@type ms.winstate.split.vertical
         ret = {
             wintype = wintype,
             width = config.width,
         }
-    elseif config.wintype == 'split' and not config.vertical then
+    elseif config.wintype == 'horizontal' then
         wintype = 'horizontal'
         ---@type ms.winstate.split.horizontal
         ret = {
@@ -97,7 +78,7 @@ function M.winstate_to_winconfig(state)
 
     state = state or data
 
-    if is_float(state) then
+    if state.wintype == 'float' then
         ret = {
             relative = 'editor',
             row = state.row,
@@ -105,9 +86,9 @@ function M.winstate_to_winconfig(state)
             width = state.width,
             height = state.height
         }
-    elseif is_horizontal(state) then
+    elseif state.wintype == 'horizontal' then
         ret = { height = state.height, vertical = false, split = 'below' }
-    elseif is_vertical(state) then
+    elseif state.wintype == 'vertical' then
         ret = { width = state.width, vertical = true, split = 'right' }
     else
         Logg:log("Invalid windowtype: ", state)
@@ -189,13 +170,20 @@ M.mt = {
             if k == 'wintype' and data[k] ~= v then
                 Logg:log("Switching wintypes from " .. data[k] .. " to " .. v)
 
-                if v == 'float' then
-                    M.prev_split = vim.fn.deepcopy(data)
-                    data = vim.tbl_deep_extend('force', data, M.prev_float)
-                else
-                    M.prev_float = vim.fn.deepcopy(data)
-                    data = vim.tbl_deep_extend('force', data, M.prev_split)
-                end
+                M.prev[data.wintype] = vim.fn.deepcopy(data)
+                data = vim.tbl_deep_extend('force', data, M.prev[v])
+                -- if v == 'float' then
+                --     if data.wintype == 'vertical' then
+                --         M.prev_vertical = vim.fn.deepcopy(data)
+                --         data = vim.tbl_deep_extend('force', data, M.prev_float)
+                --     else
+                --         M.prev_horizontal = vim.fn.deepcopy(data)
+                --         data = vim.tbl_deep_extend('force', data, M.prev_float)
+                --     end
+                -- elseif v == 'vertical' then
+                --     M.prev_float = vim.fn.deepcopy(data)
+                --     data = vim.tbl_deep_extend('force', data, M.prev_split)
+                -- end
             end
 
             data[k] = v
@@ -206,14 +194,21 @@ M.mt = {
     end
 }
 
-M.prev_float = M.msconfig_to_winstate(
-    vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'float' }))
-M.prev_split = M.msconfig_to_winstate(
-    vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'split' }))
+M.prev = {
+    float = M.msconfig_to_winstate(
+        vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'float' })),
+    vertical = M.msconfig_to_winstate(
+        vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'vertical' })),
+    horizontal = M.msconfig_to_winstate(
+        vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'horizontal' }))
+}
 
-M.is_float = is_float
-M.is_horizontal = is_horizontal
-M.is_vertical = is_vertical
+-- M.prev_float = M.msconfig_to_winstate(
+--     vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'float' }))
+-- M.prev_vertical = M.msconfig_to_winstate(
+--     vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'vertical' }))
+-- M.prev_horizontal = M.msconfig_to_winstate(
+--     vim.tbl_deep_extend('force', Config.default_config.window, { wintype = 'horizontal' }))
 
 ---@param bufnr integer
 ---@param resp string[]
@@ -238,7 +233,7 @@ local function prelude_lines()
         ("| wintype: %s"):format(data.wintype)
     }
 
-    if is_float(data) then
+    if data.wintype == 'float' then
         local flines = {
             "| row: "    .. data.row,
             "| col: "    .. data.col,
@@ -246,17 +241,18 @@ local function prelude_lines()
             "| height: " .. data.height,
         }
         table.move(flines, 1, #flines, #lines + 1, lines)
-    elseif is_horizontal(data) then
+    elseif data.wintype == 'horizontal' then
         local hlines = {
             "| height: " .. data.height,
         }
         table.insert(lines, hlines[1])
-    elseif is_vertical(data) then
+    elseif data.wintype == 'vertical' then
         local vlines = {
             "| width: "  .. data.width,
         }
         table.insert(lines, vlines[1])
     else
+        ---@diagnostic disable-next-line: undefined-field
         error("Invalid wintype: " .. data.wintype)
     end
 

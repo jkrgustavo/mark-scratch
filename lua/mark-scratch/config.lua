@@ -9,9 +9,8 @@ local M = {}
 ---@field float_right? string
 
 ---@class ms.config.partial.window
----@field wintype? 'float' | 'split'
+---@field wintype? 'float' | 'vertical' | 'horizontal'
 ---@field split_direction? 'above' | 'below' | 'right' | 'left'
----@field vertical? boolean
 ---@field width? integer
 ---@field height? integer
 ---@field float_x? integer
@@ -31,9 +30,8 @@ local M = {}
 ---@field float_right string
 
 ---@class ms.config.window
----@field wintype 'float' | 'split'
+---@field wintype 'float' | 'vertical' | 'horizontal'
 ---@field split_direction 'above' | 'below' | 'right' | 'left'
----@field vertical boolean
 ---@field width integer
 ---@field height integer
 ---@field float_x integer
