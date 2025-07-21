@@ -1,21 +1,24 @@
 local Utils = require('mark-scratch.utils')
 local Logg = require('mark-scratch.logger').logg
 
----@param bufnr integer
 ---@return vim.lsp.ClientConfig
-local function default_cli_config(bufnr)
+local function default_cli_config(_)
     ---@type vim.lsp.ClientConfig
     return {
         name = "scratch-marksman",
         cmd = { 'marksman', 'server' },
         workspace_folders = nil,
-        root_dir = vim.fn.getcwd(),
+        -- root_dir = vim.fn.getcwd(),
+        root_dir = nil,
         filetypes = { "scratchmarkdown" },
-        on_attach = function (client)
-            if client.server_capabilities.semanticTokensProvider then
-                vim.lsp.semantic_tokens.start(bufnr, client.id)
-            end
-        end
+        on_init = function(cli)
+            cli.server_capabilities.semanticTokensProvider = nil
+        end,
+        -- on_attach = function (client)
+        --     if client.server_capabilities.semanticTokensProvider then
+        --         vim.lsp.semantic_tokens.start(bufnr, client.id)
+        --     end
+        -- end
     }
 end
 
@@ -58,7 +61,7 @@ function msp:validate(bufnr, opt)
             and no_clients_attached
     end
 
-    if not valid then Logg:log("Failed to validate: ", self) end
+    if not valid then Logg:log("Failed to validate lsp:", opt) end
 
     return valid
 end
@@ -101,7 +104,9 @@ function msp:stop_lsp(bufnr)
             end
         end
 
-        return ok
+        local good = pcall(vim.treesitter.stop, bufnr)
+
+        return ok and good
     end)
 
     if done then

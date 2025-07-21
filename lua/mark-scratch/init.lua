@@ -1,14 +1,15 @@
 local Utils = require("mark-scratch.utils")
 local MSGroup = require("mark-scratch.augroup")
--- local Msp = require('mark-scratch.lsp')
 local Logg = require('mark-scratch.logger').logg
 local Config = require('mark-scratch.config')
 local Ui = require('mark-scratch.ui')
+local File = require('mark-scratch.file')
 
 ---@class Scratch
 ---@field initialized boolean
 ---@field config ms.config
 ---@field ui Ui
+---@field file ms.file
 local Scratch = {}
 Scratch.__index = Scratch
 
@@ -18,7 +19,8 @@ local function new()
     return setmetatable({
         initialized = false,
         config = config,
-        ui = Ui
+        ui = Ui,
+        file = File
     }, Scratch)
 end
 
@@ -59,29 +61,19 @@ function Scratch:destroy()
         return
     end
 
-    local bufnr = self.ui.bufnr
 
     Logg:log("Destroying scratch")
 
-    pcall(vim.api.nvim_clear_autocmds, { group = MSGroup })
     pcall(vim.api.nvim_del_augroup_by_id, MSGroup)
 
-    vim.treesitter.stop(bufnr)
-
     self.ui:shutdown()
+    self.file:shutdown()
 
     local augroup_clean = Utils.wait_until(function()
         return not pcall(vim.api.nvim_get_autocmds, { group = MSGroup })
     end)
 
-    if not augroup_clean then
-        Logg:log("Augroup wasnt cleaned", self)
-        error("unable cleanup resources")
-    end
-
-    assert(Utils.wait_until(function()
-        return not vim.api.nvim_buf_is_valid(bufnr)
-    end), "Buffer wasn't destroyed")
+    assert(augroup_clean, "Unable to delete augroup")
 
     Logg:log("Destroyed")
     self.initialized = false
@@ -97,25 +89,15 @@ function Scratch:setup(config)
     end
 
     if self.initialized then
-        Logg:log("attempt to re-initialize", self)
+        Logg:log("attempt to re-initialize")
         return
     end
 
     self.config = vim.tbl_deep_extend('force', self.config, config)
 
+    self.file:setup(config)
     self.ui:setup(config)
     self.initialized = true
-
-    vim.api.nvim_create_user_command("MSDest", function()
-        self:destroy()
-    end, { desc = "Clean resources and un-initialize everything" })
-
-    vim.api.nvim_create_autocmd({ "VimLeavePre"}, {
-        buffer = self.ui.bufnr,
-        group = MSGroup,
-        once = true,
-        callback = function() self:destroy() end,
-    })
 
     -- assert(self:validate(), "End of setup")
 end

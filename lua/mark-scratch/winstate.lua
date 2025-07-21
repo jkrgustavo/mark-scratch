@@ -30,30 +30,26 @@ local M = {}
 ---@param config ms.config.window
 ---@return ms.winstate
 function M.msconfig_to_winstate(config)
-    local wintype
     local ret = {}
     if config.wintype == 'float' then
-        wintype = 'float'
         ---@type ms.winstate.float
         ret = {
-            wintype = wintype,
+            wintype = 'float',
             height = config.height,
             width = config.width,
             row = config.float_y,
             col = config.float_x,
         }
     elseif config.wintype == 'vertical' then
-        wintype = 'vertical'
         ---@type ms.winstate.split.vertical
         ret = {
-            wintype = wintype,
+            wintype = 'vertical',
             width = config.width,
         }
     elseif config.wintype == 'horizontal' then
-        wintype = 'horizontal'
         ---@type ms.winstate.split.horizontal
         ret = {
-            wintype = wintype,
+            wintype = 'horizontal',
             height = config.height,
         }
     else
@@ -66,6 +62,16 @@ end
 
 ---@type ms.winstate
 local data = M.msconfig_to_winstate(Config.default_config.window)
+
+local function create_default(mscfg)
+    return M.msconfig_to_winstate(vim.tbl_deep_extend('force', Config.default_config.window, mscfg))
+end
+
+M.prev = {
+    float = create_default({ wintype = 'float' }),
+    vertical = create_default({ wintype = 'vertical' }),
+    horizontal = create_default({ wintype = 'horizontal' })
+}
 
 ---@param state? ms.winstate
 ---@return vim.api.keyset.win_config
@@ -87,9 +93,9 @@ function M.winstate_to_winconfig(state)
             height = state.height
         }
     elseif state.wintype == 'horizontal' then
-        ret = { height = state.height, vertical = false, split = 'below' }
+        ret = { height = state.height, vertical = false, split = 'below', win = -1 }
     elseif state.wintype == 'vertical' then
-        ret = { width = state.width, vertical = true, split = 'right' }
+        ret = { width = state.width, vertical = true, split = 'right', win = -1 }
     else
         Logg:log("Invalid windowtype: ", state)
         error("Invalid wintype")
@@ -130,7 +136,7 @@ function M.winconfig_to_winstate(cfg)
 end
 
 ---@param cfg ms.config.window
-function M.update_config(cfg)
+function M.update_winstate(cfg)
     local ws = M.msconfig_to_winstate(cfg)
     for k, v in pairs(ws) do
         data[k] = v
@@ -146,51 +152,56 @@ function M.save_winconfig(cfg)
     end
 end
 
----@param dt ms.winstate
-local on_change = function(dt)
-    error("newindex called: " .. vim.inspect(dt))
+--NOTE: Should this exist?
+---@return ms.winstate
+function M.get_current_winstate()
+    return vim.fn.deepcopy(data, true)
+end
+
+---@type fun(dt: ms.winstate)
+local mtcb = function(_)
+    vim.notify("newindex called with default callback", vim.log.levels.INFO)
 end
 
 ---@param cb fun(dt: ms.winstate)
 --- Set the callback used when '__newindex' is called
 function M.set_callback(cb)
-    on_change = cb
+    Logg:log("Set callback called")
+    mtcb = cb
 end
 
-M.mt = {
-    __index = function(_, k)
-        local ret = data[k]
-        return ret
-    end,
-    __newindex = function(_, k, v)
-        if not data[k] then
-            Logg:log(("Tried to set invalid '%s' to '%s'"):format(k, tostring(v)), data)
-            error(("invalid entry '%s'"):format(k))
-        else
-            if k == 'wintype' and data[k] ~= v then
-                Logg:log("Switching wintypes from " .. data[k] .. " to " .. v)
+---@param on_change? fun(data: ms.winstate)
+---@return table
+function M.mt(on_change)
+    local cb = on_change or mtcb
 
-                M.prev[data.wintype] = vim.fn.deepcopy(data)
-                data = vim.tbl_deep_extend('force', data, M.prev[v])
+    return {
+
+        __index = function(_, k)
+            local ret = data[k]
+            return ret
+        end,
+        __newindex = function(_, k, v)
+            if not data[k] then
+                Logg:log(("Tried to set invalid '%s' to '%s'"):format(k, tostring(v)), data)
+                error(("invalid entry '%s'"):format(k))
+            else
+                if k == 'wintype' and data[k] ~= v then
+                    Logg:log("Switching wintypes from " .. data[k] .. " to " .. v)
+
+                    M.prev[data.wintype] = vim.fn.deepcopy(data)
+                    data = vim.tbl_deep_extend('force', data, M.prev[v])
+                end
+
+                data[k] = v
+
+                cb(data)
             end
 
-            data[k] = v
-
-            on_change(data)
         end
 
-    end
-}
-
-local function create_default(mscfg)
-    return M.msconfig_to_winstate(vim.tbl_deep_extend('force', Config.default_config.window, mscfg))
+    }
 end
-
-M.prev = {
-    float = create_default({ wintype = 'float' }),
-    vertical = create_default({ wintype = 'vertical' }),
-    horizontal =create_default({ wintype = 'horizontal' })
-}
 
 ---@param bufnr integer
 ---@param resp string[]
@@ -248,13 +259,19 @@ end
 local function apply_user_input(bufnr, winid, text)
 
     if text == 'q' then
-        vim.api.nvim_win_close(winid, true)
         Logg:log("'q' recieved, closing window")
+        vim.api.nvim_win_close(winid, true)
+        return
+    elseif text == 'save' or text == 'write' then
+        Logg:log("'" .. text .. "' recieved saving contents")
+        require('mark-scratch').file:save()
+        prompt_set_response(bufnr, { "File saved!" })
+        vim.bo[bufnr].modified = false
         return
     end
 
     ---@type ms.winstate
-    local st = setmetatable({}, M.mt)
+    local st = setmetatable({}, M.mt())
 
     local trimmed = text:match("^%s*(.-)%s*$")
     if not trimmed then
@@ -270,7 +287,18 @@ local function apply_user_input(bufnr, winid, text)
         return
     end
 
-    if k ~= 'wintype' then
+    if k == 'wintype' then
+        if v ~= 'float' or v ~= 'vertical' or v ~= 'horizontal' then
+            prompt_set_response(
+                bufnr,
+                {
+                    "Invalid wintype '" .. v .. "'",
+                    "Options are 'float', 'vertical', or 'horizontal'"
+                }
+            )
+            return
+        end
+    else
         v = tonumber(v)
     end
 
@@ -287,7 +315,11 @@ local winid = nil
 local count = 0
 
 
-function M.open_settings_window()
+function M.toggle_settings_window()
+    if not require('mark-scratch').initialized then
+        return
+    end
+
     if winid and vim.api.nvim_win_is_valid(winid) then
         vim.api.nvim_win_close(winid, true)
         return
@@ -317,6 +349,17 @@ function M.open_settings_window()
             title = 'mark-scratch settings'
         })
         :info()
+
+    vim.api.nvim_create_autocmd({ "BufLeave" }, {
+        buffer = bufnr,
+        once = false,
+        group = require('mark-scratch.augroup'),
+        callback = function(_)
+            if vim.api.nvim_win_is_valid(winid) then
+                vim.api.nvim_win_close(winid, true)
+            end
+        end
+    })
 
     vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, prelude_lines())
 

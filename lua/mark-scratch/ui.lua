@@ -9,8 +9,11 @@ local Winstate = require('mark-scratch.winstate')
 ---@param mui Ui
 local function make_commands(mui)
 
+    local ms = require('mark-scratch')
+    local bufnr = ms.file.bufnr
+
     vim.api.nvim_create_autocmd({ "BufLeave" }, {
-        buffer = mui.bufnr,
+        buffer = bufnr,
         once = false,
         group = MSGroup,
         callback = function(e)
@@ -22,7 +25,7 @@ local function make_commands(mui)
     })
 
     vim.api.nvim_create_autocmd({ "WinClosed" }, {
-        buffer = mui.bufnr,
+        buffer = bufnr,
         once = false,
         group = MSGroup,
         callback = function(e)
@@ -37,79 +40,66 @@ local function make_commands(mui)
         end
     })
 
+
+    vim.api.nvim_create_autocmd({ "VimLeavePre"}, {
+        buffer = bufnr,
+        group = MSGroup,
+        once = true,
+        callback = function() ms:destroy() end,
+    })
+
     vim.api.nvim_create_user_command("MSOpen", function()
         mui:open_window()
     end, { desc = "Open scratch window" })
 
-    vim.api.nvim_create_user_command("MSClear", function()
-        mui:set_contents({})
-    end, { desc = "Clear scratch window" })
-
     vim.api.nvim_create_user_command("MSClose", function()
         mui:close_window()
     end, { desc = "Close scratch window" })
+
+    vim.api.nvim_create_user_command('MSTogg', function()
+        mui:toggle_window()
+    end, { desc = "Toggle scratch window"})
+
+    vim.api.nvim_create_user_command("MSDest", function()
+        require('mark-scratch'):destroy()
+    end, { desc = "Clean resources and un-initialize everything" })
+
+    vim.api.nvim_create_user_command("MSWrite", function()
+        require('mark-scratch').file:save()
+    end, { desc = "Clean resources and un-initialize everything" })
 
 
     Logg:log("user/autocommands setup")
 
 end
 
----@param u Ui
-local function make_keybinds(u)
-    vim.keymap.set('n', u.config.keybinds.float_up, function()
-        u.state.row = u.state.row - 5
+---@param mui Ui
+local function make_keybinds(mui)
+    local kbind = mui.config.keybinds
+
+    vim.keymap.set('n', kbind.float_up, function()
+        mui.state.row = mui.state.row - 5
     end)
-    vim.keymap.set('n', u.config.keybinds.float_down, function()
-        u.state.row = u.state.row + 5
+    vim.keymap.set('n', kbind.float_down, function()
+        mui.state.row = mui.state.row + 5
     end)
-    vim.keymap.set('n', u.config.keybinds.float_left, function()
-        u.state.col = u.state.col - 5
+    vim.keymap.set('n', kbind.float_left, function()
+        mui.state.col = mui.state.col - 10
     end)
-    vim.keymap.set('n', u.config.keybinds.float_right, function()
-        u.state.col = u.state.col + 5
+    vim.keymap.set('n', kbind.float_right, function()
+        mui.state.col = mui.state.col + 10
     end)
 
-    vim.keymap.set('n', u.config.keybinds.toggle_scratch, function()
-        u:toggle_window()
+    vim.keymap.set('n', kbind.toggle_scratch, function()
+        mui:toggle_window()
     end)
 
-    vim.keymap.set('n', u.config.keybinds.toggle_menu, Winstate.open_settings_window)
+    vim.keymap.set('n', kbind.toggle_menu, Winstate.toggle_settings_window)
 
 end
-
-local count = 0
-
----@param u Ui
-local function init(u)
-    count = count + 1
-    local buf_name = "[Note" .. "|" .. count .. "|" .. os.time() .. "|" .. math.random(1000) .. "].md"
-
-    u.bufnr = Winbuf
-        :new({ name = buf_name, scratch = true })
-        :bufopt({
-            ['filetype'] = 'scratchmarkdown',
-            ['tabstop'] = 2,
-            ['shiftwidth'] = 2
-        })
-        :bufinfo()
-
-    Logg:log(
-        "new buffer",
-        "name: " .. buf_name,
-        "id: " .. tostring(u.bufnr))
-
-    make_commands(u)
-    make_keybinds(u)
-    Winstate.update_config(u.config.window)
-
-    u.initialized = true
-    Logg:log("Initialied ui")
-end
-
 
 ---@class Ui
 ---@field lsp msp
----@field bufnr integer
 ---@field windnr integer | nil
 ---@field config ms.config
 ---@field initialized boolean
@@ -121,19 +111,25 @@ ui.__index = ui
 local function new()
 
     local instance = {
-        bufnr = -1,
         windnr = nil,
         config = Config.default_config,
         initialized = false,
         lsp = Msp,
-        state = setmetatable({}, Winstate.mt)
     }
 
-    Winstate.set_callback(function(d)
+    instance.state = setmetatable({}, Winstate.mt(function(d)
         if instance.windnr and vim.api.nvim_win_is_valid(instance.windnr) then
-            vim.api.nvim_win_set_config(instance.windnr, Winstate.winstate_to_winconfig(d))
+            local wincfg = Winstate.winstate_to_winconfig(d)
+            vim.api.nvim_win_set_config(instance.windnr, wincfg)
         end
-    end)
+    end))
+
+    -- Winstate.set_callback(function(d)
+    --     if instance.windnr and vim.api.nvim_win_is_valid(instance.windnr) then
+    --         local wincfg = Winstate.winstate_to_winconfig(d)
+    --         vim.api.nvim_win_set_config(instance.windnr, wincfg)
+    --     end
+    -- end)
 
     return setmetatable(instance, ui)
 end
@@ -141,9 +137,11 @@ end
 local instance = new()
 
 function ui:validate()
+    local bufnr = require('mark-scratch').file.bufnr
+
     local valid = self.initialized
         and (not self.windnr or vim.api.nvim_win_is_valid(self.windnr))
-        and vim.api.nvim_buf_is_valid(self.bufnr)
+        and vim.api.nvim_buf_is_valid(bufnr)
 
     if not valid then
         Logg:log(
@@ -151,8 +149,8 @@ function ui:validate()
             self.initialized,
             self.windnr,
             self.windnr and vim.api.nvim_win_is_valid(self.windnr) or false,
-            vim.api.nvim_buf_is_valid(self.bufnr),
-            self.lsp:validate(self.bufnr, { started = true }))
+            vim.api.nvim_buf_is_valid(bufnr),
+            self.lsp:validate(bufnr, { started = true }))
     end
 
     return valid
@@ -171,15 +169,23 @@ function ui:setup(config)
     self.config = vim.tbl_deep_extend('force', self.config, config)
 
     if not self.initialized then
-        init(self)
+        make_commands(self)
+        make_keybinds(self)
+
+        if not self.config.file_overrides_cfg then
+            Winstate.update_winstate(self.config.window)
+        end
+
+        self.lsp:start_lsp(require("mark-scratch").file.bufnr)
+
+        self.initialized = true
+        Logg:log("Initialied ui")
     end
 
 end
 
 function ui:open_window()
-    if not self.lsp:validate(self.bufnr, { started = true }) then
-        self.lsp:start_lsp(self.bufnr)
-    end
+    local bufnr = require('mark-scratch').file.bufnr
 
     if not self:validate() then
         Logg:log("Open window called with invalid ui")
@@ -193,7 +199,7 @@ function ui:open_window()
 
     local wintype = self.state.wintype == 'float' and 'float' or 'split'
     self.windnr = Winbuf
-        :new({ bufnr = self.bufnr })
+        :new({ bufnr = bufnr })
         :win(wintype)
         :winsetconf(Winstate.winstate_to_winconfig())
         :winopt({
@@ -215,7 +221,6 @@ function ui:close_window()
         self.windnr = nil
         return
     end
-
 
     -- Save current window state in case the user resized/moved it themselves
     local nvwincfg = vim.api.nvim_win_get_config(winid)
@@ -245,7 +250,9 @@ function ui:shutdown()
         return
     end
 
-    local buf_portals = vim.fn.win_findbuf(self.bufnr)
+    local bufnr = require('mark-scratch').file.bufnr
+
+    local buf_portals = vim.fn.win_findbuf(bufnr)
     if #buf_portals > 0 then
         for _, p in ipairs(buf_portals) do
             local ok, err = pcall(vim.api.nvim_win_close, p, true)
@@ -256,37 +263,18 @@ function ui:shutdown()
     end
     self.windnr = nil
 
-    self.lsp:stop_lsp(self.bufnr)
+    self.lsp:stop_lsp(bufnr)
     Utils.wait_until(function()
-        return self.lsp:validate(self.bufnr, { stopped = true })
+        return self.lsp:validate(bufnr, { stopped = true })
     end)
 
-    if vim.api.nvim_buf_is_valid(self.bufnr) then
-        vim.bo[self.bufnr].buflisted = false
-        vim.api.nvim_buf_delete(self.bufnr, { force = true })
-    end
-
-    local shutdown = Utils.wait_until(function()
-        return not vim.api.nvim_buf_is_valid(self.bufnr)
-    end)
-
-    if not shutdown then
-        Logg:log("timeout waiting for 'buf_is_valid' to return false", self)
-    end
+    pcall(vim.api.nvim_clear_autocmds, { group = MSGroup })
+    pcall(vim.api.nvim_del_user_command, 'MSOpen')
+    pcall(vim.api.nvim_del_user_command, 'MSClose')
+    pcall(vim.api.nvim_del_user_command, 'MSTogg')
 
     Logg:log("Finished destroying ui")
     self.initialized = false
-    self.bufnr = -1
 end
-
-function ui:set_contents(lines)
-    if not vim.api.nvim_buf_is_valid(self.bufnr) then
-        error("Invalid buffer")
-        Logg:log("Tried to set contents on an invalid buffer", lines)
-    end
-
-    vim.api.nvim_buf_set_lines(self.bufnr, 0, -1, false, lines)
-end
-
 
 return instance

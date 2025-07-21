@@ -52,4 +52,24 @@ function M.str_split(str, char)
     return res
 end
 
+
+---@param str string
+---@return string[]
+function M.str_lines(str)
+    if not str then return {} end
+
+    -- split on newlines
+    local res = {}
+    for l in str:gmatch("(.-)\n") do
+        table.insert(res, l)
+    end
+
+    -- captures a single line not containing any newlines
+    table.insert(res, str:match('^([^\n]*)$'))
+    -- captures the final line of a string with newlines, 
+    table.insert(res, str:match('\n([^\n]*)$'))
+
+    return res
+end
+
 return M

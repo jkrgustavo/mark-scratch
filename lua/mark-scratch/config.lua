@@ -20,6 +20,8 @@ local M = {}
 ---@class ms.config.partial
 ---@field keybinds? ms.config.partial.keybinds
 ---@field window? ms.config.partial.window
+---@field file_overrides_cfg? boolean
+---@field save_on_vimexit? boolean
 
 ---@class ms.config.keybinds
 ---@field toggle_menu string
@@ -44,7 +46,12 @@ local height = 50
 ---@class ms.config
 ---@field keybinds ms.config.keybinds
 ---@field window ms.config.window
+---@field file_overrides_cfg boolean
+---@field save_on_vimexit boolean
 M.default_config = {
+
+    file_overrides_cfg = true,
+    save_on_vimexit = false,
 
     keybinds = {
         toggle_menu    = '<leader>mo',
