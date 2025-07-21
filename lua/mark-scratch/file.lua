@@ -91,6 +91,49 @@ local function write_datafile(abspath, data)
     path:write(msdata, "w")
 end
 
+---@param f ms.file
+local function setup_autocommands(f)
+
+    vim.api.nvim_create_autocmd({ "BufLeave" }, {
+        buffer = f.bufnr,
+        once = false,
+        group = AuGroup,
+        callback = function()
+            if f.config.window.close_on_leave then
+                require('mark-scratch').ui:close_window()
+            end
+        end
+    })
+
+    vim.api.nvim_create_autocmd({ "WinClosed" }, {
+        buffer = f.bufnr,
+        once = false,
+        group = AuGroup,
+        callback = function()
+            if not f.config.window.close_on_leave then
+                require('mark-scratch').ui:close_window()
+            end
+        end
+    })
+
+    vim.api.nvim_create_autocmd({ 'BufWriteCmd' }, {
+        buffer = f.bufnr,
+        group = AuGroup,
+        callback = function()
+            f:save()
+        end
+    })
+
+    vim.api.nvim_create_autocmd({ "VimLeavePre"}, {
+        buffer = f.bufnr,
+        group = AuGroup,
+        once = true,
+        callback = function()
+            require('mark-scratch'):destroy()
+        end,
+    })
+end
+
 ---@class ms.file
 ---@field root string
 ---@field bufnr integer
@@ -127,13 +170,6 @@ local function new()
         vim.api.nvim_buf_set_lines(f.bufnr, 0, #md_lines, false, md_lines)
     end
 
-    vim.api.nvim_create_autocmd({ 'BufWriteCmd' }, {
-        buffer = f.bufnr,
-        group = AuGroup,
-        callback = function(_)
-            f:save()
-        end
-    })
 
     return f
 end
@@ -142,6 +178,8 @@ end
 function File:setup(config)
     config = config or {}
     self.config = vim.tbl_deep_extend('force', self.config, config)
+
+    setup_autocommands(self)
 
     if self.metadata and self.config.file_overrides_cfg then
 

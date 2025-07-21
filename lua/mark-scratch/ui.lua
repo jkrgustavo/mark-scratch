@@ -7,46 +7,7 @@ local Msp = require('mark-scratch.lsp')
 local Winstate = require('mark-scratch.winstate')
 
 ---@param mui Ui
-local function make_commands(mui)
-
-    local ms = require('mark-scratch')
-    local bufnr = ms.file.bufnr
-
-    vim.api.nvim_create_autocmd({ "BufLeave" }, {
-        buffer = bufnr,
-        once = false,
-        group = MSGroup,
-        callback = function(e)
-            if mui.config.window.close_on_leave then
-                Logg:log("Callback triggered: ", e)
-                mui:close_window()
-            end
-        end
-    })
-
-    vim.api.nvim_create_autocmd({ "WinClosed" }, {
-        buffer = bufnr,
-        once = false,
-        group = MSGroup,
-        callback = function(e)
-            if mui.windnr and not mui.config.window.close_on_leave then
-                if vim.api.nvim_win_is_valid(mui.windnr) then
-                    mui:close_window()
-                else
-                    mui.windnr = nil
-                end
-            end
-            Logg:log("Callback triggered: ", e)
-        end
-    })
-
-
-    vim.api.nvim_create_autocmd({ "VimLeavePre"}, {
-        buffer = bufnr,
-        group = MSGroup,
-        once = true,
-        callback = function() ms:destroy() end,
-    })
+local function make_commands_and_keybinds(mui)
 
     vim.api.nvim_create_user_command("MSOpen", function()
         mui:open_window()
@@ -68,15 +29,7 @@ local function make_commands(mui)
         require('mark-scratch').file:save()
     end, { desc = "Clean resources and un-initialize everything" })
 
-
-    Logg:log("user/autocommands setup")
-
-end
-
----@param mui Ui
-local function make_keybinds(mui)
     local kbind = mui.config.keybinds
-
     vim.keymap.set('n', kbind.float_up, function()
         mui.state.row = mui.state.row - 5
     end)
@@ -96,6 +49,7 @@ local function make_keybinds(mui)
 
     vim.keymap.set('n', kbind.toggle_menu, Winstate.toggle_settings_window)
 
+    Logg:log("usercommands and keybinds setup")
 end
 
 ---@class Ui
@@ -123,13 +77,6 @@ local function new()
             vim.api.nvim_win_set_config(instance.windnr, wincfg)
         end
     end))
-
-    -- Winstate.set_callback(function(d)
-    --     if instance.windnr and vim.api.nvim_win_is_valid(instance.windnr) then
-    --         local wincfg = Winstate.winstate_to_winconfig(d)
-    --         vim.api.nvim_win_set_config(instance.windnr, wincfg)
-    --     end
-    -- end)
 
     return setmetatable(instance, ui)
 end
@@ -169,8 +116,7 @@ function ui:setup(config)
     self.config = vim.tbl_deep_extend('force', self.config, config)
 
     if not self.initialized then
-        make_commands(self)
-        make_keybinds(self)
+        make_commands_and_keybinds(self)
 
         if not self.config.file_overrides_cfg then
             Winstate.update_winstate(self.config.window)
@@ -216,11 +162,12 @@ end
 function ui:close_window()
     local winid = self.windnr
 
-    if not winid or not vim.api.nvim_win_is_valid(winid) then
+    if self.is_closing or not winid or not vim.api.nvim_win_is_valid(winid) then
         Logg:log("double close")
         self.windnr = nil
         return
     end
+    self.is_closing = true
 
     -- Save current window state in case the user resized/moved it themselves
     local nvwincfg = vim.api.nvim_win_get_config(winid)
@@ -234,6 +181,7 @@ function ui:close_window()
 
     self.windnr = nil
 
+    self.is_closing = false
 end
 
 function ui:toggle_window()

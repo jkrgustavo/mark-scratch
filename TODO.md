@@ -2,10 +2,7 @@
 
 ## Goals
 
-- [ ] *save to a file*
-    - [ ] Save on close option
-- [ ] Fix ui:close_window() in order to move autocommands to file.lua
-- [ ] when user changes config in `ms:setup()` only update relavent winstate
+- [ ] when user changes config in `ms:setup()` only update relevant winstate
 - [ ] consistant type naming. (ie. 'ms.*')
 - [ ] polish
     - [ ] handle invalid settings in settings menu better
@@ -18,6 +15,9 @@
 
 ## Finished
 
+- [x] Fix ui:close_window() in order to move autocommands to file.lua
+- [x] *save to a file*
+    - [x] Save on close option
 - [x] *save horizontal and vertical splits seperately*
 - [x] change keybinds to toggle instead of just open
 - [x] update prompt text with current wintype settings dynamically
