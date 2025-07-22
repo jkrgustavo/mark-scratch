@@ -102,6 +102,8 @@ local function setup_autocommands(f)
             if f.config.window.close_on_leave then
                 require('mark-scratch').ui:close_window()
             end
+
+            vim.api.nvim_set_option_value('modified', false, { scope = 'local', buf = f.bufnr })
         end
     })
 
@@ -113,6 +115,8 @@ local function setup_autocommands(f)
             if not f.config.window.close_on_leave then
                 require('mark-scratch').ui:close_window()
             end
+
+            vim.api.nvim_set_option_value('modified', false, { scope = 'local', buf = f.bufnr })
         end
     })
 

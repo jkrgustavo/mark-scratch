@@ -2,14 +2,13 @@
 
 ## Goals
 
-- [ ] polish
-    - [ ] handle invalid settings in settings menu better
-    - [ ] handle switching between floats and splits while 'close_on_leave' is false
 - [ ] refactor
 - [ ] support multiple files/buffers
 
 ## Finished
 
+- [x] handle invalid settings in settings menu better
+- [x] handle switching between floats and splits while 'close_on_leave' is false
 - [x] consistant type naming. (ie. 'ms.*')
 - [x] Fix ui:close_window() in order to move autocommands to file.lua
 - [x] *save to a file*
