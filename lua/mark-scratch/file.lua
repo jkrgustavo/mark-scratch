@@ -103,7 +103,7 @@ local function setup_autocommands(f)
                 require('mark-scratch').ui:close_window()
             end
 
-            vim.api.nvim_set_option_value('modified', false, { scope = 'local', buf = f.bufnr })
+            vim.bo[f.bufnr].modified = false
         end
     })
 
@@ -116,7 +116,7 @@ local function setup_autocommands(f)
                 require('mark-scratch').ui:close_window()
             end
 
-            vim.api.nvim_set_option_value('modified', false, { scope = 'local', buf = f.bufnr })
+            vim.bo[f.bufnr].modified = false
         end
     })
 
@@ -125,6 +125,7 @@ local function setup_autocommands(f)
         group = AuGroup,
         callback = function()
             f:save()
+            vim.bo[f.bufnr].modified = false
         end
     })
 
@@ -133,6 +134,7 @@ local function setup_autocommands(f)
         group = AuGroup,
         once = true,
         callback = function()
+            vim.notify("Quitting", vim.log.levels.ERROR)
             require('mark-scratch'):destroy()
         end,
     })
@@ -162,6 +164,7 @@ local function new()
             ['filetype'] = "scratchmarkdown",
             ['tabstop'] = 2,
             ['shiftwidth'] = 2,
+            ['buflisted'] = false,
             ['buftype'] = 'acwrite'
         })
         :bufinfo()
@@ -172,6 +175,7 @@ local function new()
 
         local md_lines = Utils.str_lines(data.data)
         vim.api.nvim_buf_set_lines(f.bufnr, 0, #md_lines, false, md_lines)
+        vim.bo[f.bufnr].modified = false
     end
 
 

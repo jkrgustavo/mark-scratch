@@ -6,10 +6,10 @@ local function default_cli_config(_)
     ---@type vim.lsp.ClientConfig
     return {
         name = "scratch-marksman",
-        cmd = { 'marksman', 'server' },
+        cmd = { vim.fn.stdpath('data') .. "/mason/bin/marksman", 'server' },
         workspace_folders = nil,
-        -- root_dir = vim.fn.getcwd(),
-        root_dir = nil,
+        root_dir = vim.fn.getcwd(),
+        -- root_dir = nil,
         filetypes = { "scratchmarkdown" },
         on_init = function(cli)
             cli.server_capabilities.semanticTokensProvider = nil
@@ -137,6 +137,7 @@ function msp:start_lsp(bufnr, config)
     if not lspnr then
         Logg:log("Couldn't start the lsp", self)
         error("Unable to start lsp server")
+        return
     end
 
     vim.schedule(function()
@@ -162,10 +163,19 @@ end
 local function new()
     Logg:log("Creating new msp")
 
-    return setmetatable({
+    local lsp = setmetatable({
         client = nil,
         started = false,
     }, msp)
+
+    vim.api.nvim_create_autocmd('FileType', {
+        pattern = "scratchmarkdown",
+        callback = function(ev)
+            lsp:start_lsp(ev.buf)
+        end
+    })
+
+    return lsp
 end
 
 local instance = new()

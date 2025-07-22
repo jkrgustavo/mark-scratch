@@ -124,8 +124,6 @@ function ui:setup(config)
             Winstate.update_winstate(self.config.window)
         end
 
-        self.lsp:start_lsp(require("mark-scratch").file.bufnr)
-
         self.initialized = true
         Logg:log("Initialied ui")
     end
