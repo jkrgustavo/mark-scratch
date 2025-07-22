@@ -6,7 +6,7 @@ local Config = require('mark-scratch.config')
 local Msp = require('mark-scratch.lsp')
 local Winstate = require('mark-scratch.winstate')
 
----@param mui Ui
+---@param mui ms.ui
 local function make_commands_and_keybinds(mui)
 
     vim.api.nvim_create_user_command("MSOpen", function()
@@ -52,8 +52,8 @@ local function make_commands_and_keybinds(mui)
     Logg:log("usercommands and keybinds setup")
 end
 
----@class Ui
----@field lsp msp
+---@class ms.ui
+---@field lsp ms.lsp
 ---@field windnr integer | nil
 ---@field config ms.config
 ---@field initialized boolean
@@ -61,7 +61,7 @@ end
 local ui = {}
 ui.__index = ui
 
----@return Ui
+---@return ms.ui
 local function new()
 
     local instance = {
@@ -69,14 +69,16 @@ local function new()
         config = Config.default_config,
         initialized = false,
         lsp = Msp,
+        state = setmetatable({}, Winstate.mt())
     }
 
-    instance.state = setmetatable({}, Winstate.mt(function(d)
+    Winstate.set_callback(function(d)
+        Logg:log("Valid")
         if instance.windnr and vim.api.nvim_win_is_valid(instance.windnr) then
             local wincfg = Winstate.winstate_to_winconfig(d)
             vim.api.nvim_win_set_config(instance.windnr, wincfg)
         end
-    end))
+    end)
 
     return setmetatable(instance, ui)
 end

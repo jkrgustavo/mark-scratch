@@ -5,10 +5,10 @@ local Config = require('mark-scratch.config')
 local Ui = require('mark-scratch.ui')
 local File = require('mark-scratch.file')
 
----@class Scratch
+---@class ms.scratch
 ---@field initialized boolean
 ---@field config ms.config
----@field ui Ui
+---@field ui ms.ui
 ---@field file ms.file
 local Scratch = {}
 Scratch.__index = Scratch
@@ -98,8 +98,6 @@ function Scratch:setup(config)
     self.file:setup(config)
     self.ui:setup(config)
     self.initialized = true
-
-    -- assert(self:validate(), "End of setup")
 end
 
 return instance

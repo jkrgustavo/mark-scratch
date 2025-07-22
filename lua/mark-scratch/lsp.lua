@@ -22,7 +22,7 @@ local function default_cli_config(_)
     }
 end
 
----@class msp
+---@class ms.lsp
 ---@field client? vim.lsp.Client
 ---@field started boolean
 local msp = {}
@@ -158,7 +158,7 @@ function msp:start_lsp(bufnr, config)
     Logg:log("Lsp started", config)
 end
 
----@return msp
+---@return ms.lsp
 local function new()
     Logg:log("Creating new msp")
 

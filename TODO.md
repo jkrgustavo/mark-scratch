@@ -2,19 +2,15 @@
 
 ## Goals
 
-- [ ] when user changes config in `ms:setup()` only update relevant winstate
-- [ ] consistant type naming. (ie. 'ms.*')
 - [ ] polish
     - [ ] handle invalid settings in settings menu better
     - [ ] handle switching between floats and splits while 'close_on_leave' is false
-
-- [ ] refactor window representation
-    - bundle buffer/window info into a single object
-    - store in lists
-    - winbuf is useful here
+- [ ] refactor
+- [ ] support multiple files/buffers
 
 ## Finished
 
+- [x] consistant type naming. (ie. 'ms.*')
 - [x] Fix ui:close_window() in order to move autocommands to file.lua
 - [x] *save to a file*
     - [x] Save on close option

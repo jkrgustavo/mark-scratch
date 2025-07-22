@@ -70,7 +70,7 @@ local function add_debug_info(txt, lvl)
     return ret
 end
 
----@class logger
+---@class ms.logger
 ---@field lines string[]
 ---@field level ms.log.levels
 local logger = {}
@@ -149,7 +149,7 @@ function logger:set_level(lvl)
     self.level = lvl
 end
 
----@type logger
+---@type ms.logger
 M.logg = init()
 
 vim.api.nvim_create_user_command('LGClear', function() M.logg:clear() end, { desc = "clear logs"})

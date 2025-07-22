@@ -173,7 +173,7 @@ end
 ---@param on_change? fun(data: ms.winstate)
 ---@return table
 function M.mt(on_change)
-    local cb = on_change or mtcb
+    local cb = on_change or function(d) mtcb(d) end
 
     return {
 
@@ -255,6 +255,37 @@ local function prelude_lines()
 end
 
 ---@param bufnr integer
+---@param k string
+---@param v string
+---@return boolean
+local function verify_inputs(bufnr, k, v)
+
+    if k == 'wintype' then
+        if not M.prev[v] then
+            prompt_set_response(bufnr, {
+                "Invalid wintype '" .. v .. "'",
+                "Options are 'float', 'vertical', or 'horizontal'"
+            })
+            return false
+        end
+    else
+        local valid_opts = M.prev[data.wintype]
+
+        if not valid_opts[k] then
+            prompt_set_response(bufnr, { "Invalid setting '" .. k .. "'" })
+            return false
+        end
+
+        if not tonumber(v) then
+            prompt_set_response(bufnr, { "Value must be a number" })
+            return false
+        end
+    end
+
+    return true
+end
+
+---@param bufnr integer
 ---@param text string
 local function apply_user_input(bufnr, winid, text)
 
@@ -287,27 +318,30 @@ local function apply_user_input(bufnr, winid, text)
         return
     end
 
+    if not verify_inputs(bufnr, k, v) then
+        Logg:log(("Invalid inputs '%s' and '%s'."):format(k, v))
+        return
+    end
+
     if k == 'wintype' then
-        if v ~= 'float' or v ~= 'vertical' or v ~= 'horizontal' then
-            prompt_set_response(
-                bufnr,
-                {
-                    "Invalid wintype '" .. v .. "'",
-                    "Options are 'float', 'vertical', or 'horizontal'"
-                }
-            )
-            return
-        end
+        local scratch = require('mark-scratch')
+        local was_open = vim.api.nvim_win_is_valid(scratch.ui.windnr)
+
+        scratch.ui:close_window()
+
+        st[k] = v
+
+        if was_open then scratch.ui:open_window() end
     else
-        v = tonumber(v)
+        st[k] = tonumber(v)
     end
 
     Logg:log(("Setting '%s' to '%s' from prompt buffer"):format(k, v))
 
-    st[k] = v
-
-    vim.api.nvim_buf_set_lines(bufnr, 0, -2, false, prelude_lines())
-    prompt_set_response(bufnr, { ("%s %s"):format(Utils.tostrings(k, v)) })
+    if vim.api.nvim_buf_is_valid(bufnr) then
+        vim.api.nvim_buf_set_lines(bufnr, 0, -2, false, prelude_lines())
+        prompt_set_response(bufnr, { ("%s %s"):format(Utils.tostrings(k, v)) })
+    end
 end
 
 local bufnr = -1
