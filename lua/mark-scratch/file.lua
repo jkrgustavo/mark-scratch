@@ -40,7 +40,8 @@ local function get_root()
 
     if not path then
         Logg:log("Searched upwards but couldn't find a git file. Cwd: ", vim.uv.cwd())
-        error("Useage outside a git repository is unsupported lol")
+        vim.notify("Useage outside a git repository is unsupported lol", vim.log.levels.INFO)
+        return
     end
 
     return path:parent():absolute()
